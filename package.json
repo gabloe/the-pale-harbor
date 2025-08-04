@@ -1,0 +1,35 @@
+{
+  "name": "the-pale-harbor",
+  "version": "1.0.0",
+  "description": "A 2D psychological horror game set in a fog-shrouded coastal town",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "serve": "python3 -m http.server 8000",
+    "dev": "python3 -m http.server 8000"
+  },
+  "keywords": [
+    "game",
+    "horror",
+    "psychological",
+    "2d",
+    "javascript",
+    "html5",
+    "canvas"
+  ],
+  "author": "AI Game Developer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/username/the-pale-harbor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/username/the-pale-harbor/issues"
+  },
+  "homepage": "https://github.com/username/the-pale-harbor#readme",
+  "devDependencies": {},
+  "dependencies": {},
+  "engines": {
+    "node": ">=12.0.0"
+  }
+}
