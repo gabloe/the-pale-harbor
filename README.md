@@ -1,6 +1,8 @@
 # The Pale Harbor
 *A 2D Psychological Horror Game*
 
+**Presented by Red Triangle Studios**
+
 ## Overview
 The Pale Harbor is a psychological horror game set in a fog-shrouded coastal town. You play as a lighthouse keeper investigating the mysterious disappearance of the previous keeper. As you explore the town and uncover its dark secrets, your grip on reality slowly deteriorates.
 
@@ -26,6 +28,7 @@ You arrive at the remote Pale Harbor to take over lighthouse duties after the pr
 - **Time-based events** with increased supernatural activity during night hours
 
 ### Technical Features
+- **Cinematic title screen** with Red Triangle Studios branding
 - **HTML5 Canvas rendering** for smooth 2D graphics
 - **Web Audio API** for dynamic sound generation
 - **Responsive controls** with keyboard input
@@ -191,12 +194,14 @@ The game is designed to be easily modifiable:
    ```
 
 ### Playing the Game
-1. Use **WASD** or **arrow keys** to move around the harbor
-2. Press **E** to interact with highlighted objects
-3. Follow the story through dialogue and exploration
-4. Monitor your sanity bar (blue bar in upper left)
-5. Collect items automatically by interacting with them
-6. Survive the psychological horrors of Pale Harbor
+1. **Title Screen**: The game opens with the Red Triangle Studios logo and title screen
+2. **Press any key** to begin once the prompt appears
+3. Use **WASD** or **arrow keys** to move around the harbor
+4. Press **E** to interact with highlighted objects
+5. Follow the story through dialogue and exploration
+6. Monitor your sanity bar (blue bar in upper left)
+7. Collect items automatically by interacting with them
+8. Survive the psychological horrors of Pale Harbor
 
 **Important:** The game must be run through a web server (not opened directly as a file) due to browser security restrictions for loading game assets.
 

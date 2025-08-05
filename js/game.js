@@ -7,11 +7,15 @@ class Game {
         this.height = this.canvas.height;
         
         // Game state
-        this.gameState = 'playing'; // playing, paused, dialogue, menu
+        this.gameState = 'title'; // title, playing, paused, dialogue, menu
         this.currentLocation = 'lighthouse_entrance';
         this.sanity = 100;
         this.time = 0;
         this.gameTime = 18.5; // Start at 6:30 PM (18.5 hours)
+        
+        // Title screen state
+        this.titleScreenTime = 0;
+        this.showPressAnyKey = false;
         
         // Core systems
         // Initialize player in front of the lighthouse door
@@ -46,8 +50,7 @@ class Game {
         // Initialize UI
         this.updateInventoryUI();
         
-        // Initialize first scene
-        this.startGame();
+        // Start with title screen (don't call startGame() here)
     }
     
     setupInput() {
@@ -77,6 +80,13 @@ class Game {
                 e.preventDefault();
             }
             
+            // Title screen - any key starts the game
+            if (this.gameState === 'title' && this.showPressAnyKey) {
+                this.startGameFromTitle();
+                e.preventDefault();
+                return;
+            }
+            
             if (e.key.toLowerCase() === 'e' && canPressKey('e')) {
                 this.interact();
             }
@@ -99,6 +109,11 @@ class Game {
                 this.keys[keyName.toLowerCase()] = false;
             }
         });
+    }
+    
+    startGameFromTitle() {
+        this.gameState = 'playing';
+        this.startGame();
     }
     
     startGame() {
@@ -134,6 +149,17 @@ class Game {
     
     update(deltaTime) {
         this.time += deltaTime;
+        
+        // Handle title screen
+        if (this.gameState === 'title') {
+            this.titleScreenTime += deltaTime;
+            // Show "Press any key" after 2 seconds
+            if (this.titleScreenTime > 2.0) {
+                this.showPressAnyKey = true;
+            }
+            return; // Don't update game systems on title screen
+        }
+        
         this.gameTime += deltaTime / 60; // 1 real second = 1 game minute
         
         if (this.gameTime >= 24) this.gameTime = 0;
@@ -191,6 +217,12 @@ class Game {
             this.ctx.fillStyle = '#0a0a0a';
             this.ctx.fillRect(0, 0, this.width, this.height);
             
+            // Handle title screen rendering
+            if (this.gameState === 'title') {
+                this.renderTitleScreen();
+                return;
+            }
+            
             // Save context for camera transform
             this.ctx.save();
             
@@ -218,6 +250,98 @@ class Game {
             console.error('Error in render:', error);
             console.error('Stack trace:', error.stack);
         }
+    }
+    
+    renderTitleScreen() {
+        const ctx = this.ctx;
+        const centerX = this.width / 2;
+        const centerY = this.height / 2;
+        
+        // Dark background with subtle gradient
+        const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.max(this.width, this.height));
+        gradient.addColorStop(0, '#1a1a2e');
+        gradient.addColorStop(1, '#0a0a0a');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, this.width, this.height);
+        
+        // Fog effect
+        const fogAlpha = 0.3 + Math.sin(this.titleScreenTime * 0.8) * 0.1;
+        ctx.fillStyle = `rgba(200, 200, 220, ${fogAlpha * 0.15})`;
+        ctx.fillRect(0, 0, this.width, this.height);
+        
+        // Red Triangle Studios logo
+        ctx.save();
+        ctx.translate(centerX, centerY - 120);
+        
+        // Draw Red Triangle with glow effect
+        const triangleSize = 60 + Math.sin(this.titleScreenTime * 2) * 5;
+        
+        // Glow effect
+        ctx.shadowColor = '#ff0000';
+        ctx.shadowBlur = 30;
+        ctx.fillStyle = '#cc0000';
+        ctx.beginPath();
+        ctx.moveTo(0, -triangleSize * 0.6);
+        ctx.lineTo(-triangleSize * 0.5, triangleSize * 0.4);
+        ctx.lineTo(triangleSize * 0.5, triangleSize * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Inner triangle with brighter red
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = '#ff0000';
+        const innerSize = triangleSize * 0.7;
+        ctx.beginPath();
+        ctx.moveTo(0, -innerSize * 0.6);
+        ctx.lineTo(-innerSize * 0.5, innerSize * 0.4);
+        ctx.lineTo(innerSize * 0.5, innerSize * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.restore();
+        
+        // Studio name
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 24px serif';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#000000';
+        ctx.shadowBlur = 5;
+        ctx.fillText('RED TRIANGLE STUDIOS', centerX, centerY - 40);
+        
+        // "Presents" text
+        ctx.fillStyle = '#cccccc';
+        ctx.font = '16px serif';
+        ctx.fillText('presents', centerX, centerY - 10);
+        
+        // Game title with dramatic effect
+        const titleY = centerY + 60;
+        const titleGlow = Math.sin(this.titleScreenTime * 1.5) * 0.3 + 0.7;
+        
+        // Title shadow/glow
+        ctx.shadowColor = '#004466';
+        ctx.shadowBlur = 20 * titleGlow;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 48px serif';
+        ctx.fillText('THE PALE HARBOR', centerX, titleY);
+        
+        // Subtitle
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = '#aaaaaa';
+        ctx.font = 'italic 18px serif';
+        ctx.fillText('A Psychological Horror Experience', centerX, titleY + 35);
+        
+        // Press any key (if shown)
+        if (this.showPressAnyKey) {
+            const blinkAlpha = Math.sin(this.titleScreenTime * 3) * 0.5 + 0.5;
+            ctx.fillStyle = `rgba(255, 255, 255, ${blinkAlpha})`;
+            ctx.font = '20px serif';
+            ctx.shadowBlur = 5;
+            ctx.fillText('Press any key to begin...', centerX, centerY + 150);
+        }
+        
+        // Reset text alignment and shadows
+        ctx.textAlign = 'left';
+        ctx.shadowBlur = 0;
     }
     
     renderTimeOfDay() {
