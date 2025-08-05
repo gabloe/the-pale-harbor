@@ -23,7 +23,7 @@ class Game {
         this.world = new World(this);
         this.dialogue = new DialogueSystem(this);
         this.horrorEffects = new HorrorEffects(this);
-        this.inventory = ['Lighthouse Key', 'Old Journal'];
+        this.inventory = []; // Start with empty inventory - player must find all items
         
         // Input handling
         this.keys = {};
