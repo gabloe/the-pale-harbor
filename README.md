@@ -89,11 +89,13 @@ Items in The Pale Harbor are used **automatically** when you interact with objec
 1. Start by collecting the **Keeper's Journal** from the dock
 2. Find the **Lighthouse Key** hidden in the town square (near coordinates 1180, 690)
 3. Get the **Old Lantern** from behind the lighthouse
-4. Find the **Boat Hook** near the lighthouse and use it to pull the sailboat close
-5. Search the **sailboat** for the Ship's Log (now accessible after pulling it close)
-6. Use the journal to access the **bookshop** and get the Cursed Tome
-7. Use the key to enter the **lighthouse** and search the keeper's desk
-8. Use your knowledge to climb the stairs and claim the **lighthouse lens**
+4. **IMPORTANT**: Before entering the lighthouse, activate the **Beacon Control Panel** (located outside the lighthouse, to the right)
+5. Use the key to enter the **lighthouse** (now that the beacon is active, stairs are safe)
+6. Find the **Boat Hook** near the lighthouse and use it to pull the sailboat close
+7. Search the **sailboat** for the Ship's Log (now accessible after pulling it close)
+8. Use the journal to access the **bookshop** and get the Cursed Tome
+9. Search the keeper's desk inside the lighthouse for the Final Entry
+10. With the beacon active and the Cursed Tome in hand, climb the stairs to claim the **lighthouse lens**
 
 ## Sanity System
 

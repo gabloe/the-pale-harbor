@@ -12,6 +12,7 @@ class Game {
         this.sanity = 100;
         this.time = 0;
         this.gameTime = 18.5; // Start at 6:30 PM (18.5 hours)
+        this.beaconActive = false; // Track if lighthouse beacon is activated
         
         // Title screen state
         this.titleScreenTime = 0;
@@ -49,6 +50,9 @@ class Game {
         
         // Initialize UI
         this.updateInventoryUI();
+        
+        // Floating text notifications for sanity changes
+        this.floatingTexts = [];
         
         // Start with title screen (don't call startGame() here)
     }
@@ -121,9 +125,9 @@ class Game {
         this.dialogue.start([
             "The boat's engine sputters to silence as you reach the dock.",
             "Pale Harbor stretches before you, shrouded in an unnatural fog.",
-            "The lighthouse beam hasn't been seen for three days...",
+            "The lighthouse stands dark and silent against the stormy sky.",
             "Something is wrong here. You can feel it in your bones.",
-            "",
+            "Why isn't the lighthouse beacon lit? There must be a reason.",
             "Remember: Your sanity will drain at night but heal during dawn and day.",
             "Press 'M' to meditate in safe places during daylight to restore sanity.",
             "Sleep in beds, pray at statues, and find important items to stay sane."
@@ -188,6 +192,9 @@ class Game {
         
         this.sanity = Math.max(0, Math.min(100, this.sanity));
         
+        // Update floating texts
+        this.updateFloatingTexts(deltaTime);
+        
         // Check for game over conditions
         if (this.sanity <= 0 && this.gameState === 'playing') {
             this.triggerGameOver('sanity');
@@ -246,6 +253,9 @@ class Game {
             
             // Render UI elements
             this.renderTimeOfDay();
+            
+            // Render floating texts on top of everything
+            this.renderFloatingTexts();
         } catch (error) {
             console.error('Error in render:', error);
             console.error('Stack trace:', error.stack);
@@ -368,6 +378,39 @@ class Game {
         }
     }
     
+    renderFloatingTexts() {
+        this.ctx.save();
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        
+        this.floatingTexts.forEach(text => {
+            this.ctx.save();
+            this.ctx.globalAlpha = text.opacity;
+            
+            // Main text (sanity change)
+            this.ctx.font = 'bold 20px serif';
+            this.ctx.fillStyle = text.color;
+            this.ctx.strokeStyle = '#000000';
+            this.ctx.lineWidth = 2;
+            this.ctx.strokeText(text.text, text.x, text.y);
+            this.ctx.fillText(text.text, text.x, text.y);
+            
+            // Reason text (smaller, below main text)
+            if (text.reason) {
+                this.ctx.font = '14px serif';
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 1;
+                this.ctx.strokeText(text.reason, text.x, text.y + 25);
+                this.ctx.fillText(text.reason, text.x, text.y + 25);
+            }
+            
+            this.ctx.restore();
+        });
+        
+        this.ctx.restore();
+    }
+    
     interact() {
         if (this.gameState !== 'playing') return;
         
@@ -392,15 +435,31 @@ class Game {
             this.updateInventoryUI();
             
             // Gaining important story items restores some sanity (knowledge brings hope)
-            const importantItems = [
-                'Lighthouse Key', 'Keeper\'s Journal', 'Old Lantern', 'Cursed Tome', 
-                'Ship\'s Log', 'Final Entry', 'Lighthouse Lens'
+            // But exclude disturbing items that should have net negative effects
+            const positiveItems = [
+                'Lighthouse Key', 'Old Lantern'
             ];
             
-            if (importantItems.includes(item)) {
-                this.increaseSanity(5);
-                console.log(`Found important item: ${item}. Sanity restored.`);
+            const neutralItems = [
+                'Boat Hook', 'Navigation Notes', 'Personal Letter', 'Broken Compass', 'Tunnel Access'
+            ];
+            
+            // These items have complex sanity effects handled in their interactions
+            const complexItems = [
+                'Keeper\'s Journal', 'Cursed Tome', 'Ship\'s Log', 'Final Entry', 'Lighthouse Lens'
+            ];
+            
+            if (positiveItems.includes(item)) {
+                this.increaseSanity(5, 'Knowledge brings hope');
+                console.log(`Found positive item: ${item}. Sanity restored.`);
+            } else if (complexItems.includes(item)) {
+                console.log(`Found complex item: ${item}. Sanity handled by interaction.`);
+            } else if (neutralItems.includes(item)) {
+                console.log(`Found neutral item: ${item}. No sanity change.`);
+            } else {
+                console.log(`Found unknown item: ${item}. No sanity change.`);
             }
+            // Neutral and complex items don't automatically change sanity
         }
     }
     
@@ -439,41 +498,30 @@ class Game {
             sanityFill.style.backgroundColor = '#4a90e2';
         }
         
-        // Debug: Show game time in corner
+        // Update time display in UI
         const hours = Math.floor(this.gameTime);
         const minutes = Math.floor((this.gameTime - hours) * 60);
         const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         
-        let timeDisplay = document.getElementById('timeDisplay');
-        if (!timeDisplay) {
-            timeDisplay = document.createElement('div');
-            timeDisplay.id = 'timeDisplay';
-            timeDisplay.style.position = 'absolute';
-            timeDisplay.style.top = '10px';
-            timeDisplay.style.right = '10px';
-            timeDisplay.style.color = 'white';
-            timeDisplay.style.fontSize = '14px';
-            timeDisplay.style.fontFamily = 'monospace';
-            timeDisplay.style.zIndex = '1000';
-            document.body.appendChild(timeDisplay);
+        const timeDisplay = document.getElementById('timeDisplay');
+        if (timeDisplay) {
+            // Show sanity status and restoration info
+            let sanityStatus = '';
+            if (this.gameTime >= 6 && this.gameTime <= 8) {
+                sanityStatus = ' (Dawn - Slowly Healing)';
+                timeDisplay.style.color = '#90c090'; // Light green
+            } else if (this.gameTime >= 10 && this.gameTime <= 16) {
+                sanityStatus = ' (Daylight - Healing)';
+                timeDisplay.style.color = '#c0c090'; // Light yellow
+            } else if (this.gameTime > 22 || this.gameTime < 6) {
+                sanityStatus = ' (Night - Losing Sanity)';
+                timeDisplay.style.color = '#c09090'; // Light red
+            } else {
+                timeDisplay.style.color = '#aaa';
+            }
+            
+            timeDisplay.textContent = `Time: ${timeString}${sanityStatus}`;
         }
-        
-        // Show sanity status and restoration info
-        let sanityStatus = '';
-        if (this.gameTime >= 6 && this.gameTime <= 8) {
-            sanityStatus = ' (Dawn - Slowly Healing)';
-            timeDisplay.style.color = '#90c090'; // Light green
-        } else if (this.gameTime >= 10 && this.gameTime <= 16) {
-            sanityStatus = ' (Daylight - Healing)';
-            timeDisplay.style.color = '#c0c090'; // Light yellow
-        } else if (this.gameTime > 22 || this.gameTime < 6) {
-            sanityStatus = ' (Night - Losing Sanity)';
-            timeDisplay.style.color = '#c09090'; // Light red
-        } else {
-            timeDisplay.style.color = 'white';
-        }
-        
-        timeDisplay.textContent = `Time: ${timeString}${sanityStatus}`;
     }
     
     updateInventoryUI() {
@@ -487,6 +535,10 @@ class Game {
             div.style.padding = '2px 4px';
             div.style.borderRadius = '2px';
             div.style.transition = 'background-color 0.2s ease';
+            div.style.fontSize = '12px';
+            div.style.lineHeight = '1.3';
+            div.style.wordWrap = 'break-word';
+            div.style.marginBottom = '1px';
             
             // Add hover effect
             div.addEventListener('mouseenter', () => {
@@ -578,15 +630,53 @@ class Game {
         this.camera.shake = Math.max(this.camera.shake, intensity);
     }
     
-    decreaseSanity(amount) {
+    decreaseSanity(amount, reason = 'Disturbed by the supernatural') {
         this.sanity -= amount;
         this.sanity = Math.max(0, this.sanity);
         this.shakeCamera(amount / 2, 0.3);
+        
+        // Show floating text for sanity loss
+        this.showFloatingText(`-${Math.round(amount)} Sanity`, '#ff6666', reason);
     }
     
-    increaseSanity(amount) {
+    increaseSanity(amount, reason = 'Mind finds peace') {
         this.sanity += amount;
         this.sanity = Math.min(100, this.sanity);
+        
+        // Show floating text for sanity gain
+        this.showFloatingText(`+${Math.round(amount)} Sanity`, '#66ff66', reason);
+    }
+    
+    showFloatingText(text, color, reason) {
+        this.floatingTexts.push({
+            text: text,
+            reason: reason,
+            color: color,
+            x: this.width / 2, // Center of screen
+            y: 60, // Top area, below time display
+            opacity: 1.0,
+            lifetime: 3.0, // 3 seconds total
+            age: 0,
+            velocityY: -20 // Float upward
+        });
+    }
+    
+    updateFloatingTexts(deltaTime) {
+        // Update and filter floating texts
+        this.floatingTexts = this.floatingTexts.filter(text => {
+            text.age += deltaTime;
+            text.y += text.velocityY * deltaTime;
+            
+            // Fade out over time
+            const fadeStart = text.lifetime * 0.6; // Start fading at 60% of lifetime
+            if (text.age > fadeStart) {
+                const fadeProgress = (text.age - fadeStart) / (text.lifetime - fadeStart);
+                text.opacity = 1.0 - fadeProgress;
+            }
+            
+            // Remove when expired
+            return text.age < text.lifetime;
+        });
     }
     
     attemptMeditation() {
@@ -632,10 +722,10 @@ class Game {
             "You sit quietly and close your eyes.",
             "Taking deep breaths, you try to center yourself.",
             "The daylight warms your face and calms your nerves.",
-            `You feel much more at peace. (+${sanityGain} Sanity)`
+            `You feel much more at peace.`
         ]);
         
-        this.increaseSanity(sanityGain);
+        this.increaseSanity(sanityGain, 'Peaceful meditation');
         this.gameTime += timePass;
         
         // Ensure time doesn't go past 24 hours

@@ -137,6 +137,49 @@
     align-items: center;
 }
 
+/* Dialogue text formatting with proper spacing */
+#dialogueText b {
+    margin: 0 1px; /* Add small margins around bold text */
+    padding: 0 1px; /* Add small padding for extra spacing */
+}
+
+#dialogueText span {
+    margin: 0 1px; /* Add small margins around span elements */
+    padding: 0 1px; /* Add small padding for extra spacing */
+}
+
+/* Ensure no spacing issues with inline elements */
+#dialogueText b::before,
+#dialogueText b::after,
+#dialogueText span::before,
+#dialogueText span::after {
+    content: " "; /* Add explicit space characters */
+    font-size: 0; /* Make the spaces invisible but present for layout */
+    line-height: 0;
+}
+
+/* CSS-only word emphasis - simple approach with text effects */
+#dialogue #dialogueText.has-lighthouse {
+    text-shadow: 0 0 20px rgba(255, 255, 255, 1.0), 0 0 10px rgba(255, 255, 255, 0.8), 2px 2px 4px rgba(0,0,0,0.8) !important;
+    font-weight: bold !important;
+    color: #ffffff !important;
+    filter: brightness(1.5) !important;
+}
+
+#dialogue #dialogueText.has-key {
+    text-shadow: 0 0 20px rgba(255, 221, 0, 1.0), 0 0 10px rgba(255, 221, 0, 0.8), 2px 2px 4px rgba(0,0,0,0.8) !important;
+    color: #ffdd00 !important;
+    font-weight: bold !important;
+    filter: brightness(1.5) !important;
+}
+
+#dialogue #dialogueText.has-journal {
+    text-shadow: 0 0 20px rgba(136, 204, 255, 1.0), 0 0 10px rgba(136, 204, 255, 0.8), 2px 2px 4px rgba(0,0,0,0.8) !important;
+    color: #88ccff !important;
+    font-weight: bold !important;
+    filter: brightness(1.5) !important;
+}
+
 /* Horror-specific visual effects */
 .screen-glitch {
     animation: glitch 0.3s infinite;

@@ -29,6 +29,8 @@ class World {
                 staticObjects: [
                     // Lighthouse
                     { type: 'lighthouse', x: 500, y: 400, width: 100, height: 200 },
+                    // Beacon control panel (outside lighthouse, to the right)
+                    { type: 'beacon_panel', x: 620, y: 520, width: 30, height: 40 },
                     // Dock structures (extending from shore into water)
                     { type: 'dock', x: 390, y: 780, width: 120, height: 200 },
                     // Town Buildings - arranged in a proper grid around central square
@@ -281,6 +283,47 @@ class World {
             }
         });
         
+        // Beacon Control Panel (outside lighthouse)
+        this.interactables.push({
+            x: 620,
+            y: 520,
+            width: 30,
+            height: 40,
+            type: 'beacon_panel',
+            name: 'Beacon Control Panel',
+            interact: (game) => {
+                if (!game.hasItem('Lighthouse Key')) {
+                    game.dialogue.start([
+                        "An old control panel covered in switches and dials.",
+                        "The metal surface is weathered and corroded.",
+                        "It looks like it controls the lighthouse beacon.",
+                        "But without access to the lighthouse, this won't help much."
+                    ]);
+                    return;
+                }
+                
+                if (!game.beaconActive) {
+                    game.dialogue.start([
+                        "You examine the beacon control panel carefully.",
+                        "The main power switch is in the OFF position.",
+                        "You flip the switch and hear machinery humming to life.",
+                        "The lighthouse beacon begins to glow with an eerie light!",
+                        "",
+                        "The beacon is now active. You can safely ascend the stairs."
+                    ]);
+                    game.beaconActive = true;
+                    game.increaseSanity(8, 'Light pierces the darkness');
+                } else {
+                    game.dialogue.start([
+                        "The beacon control panel hums with electrical activity.",
+                        "The main switch glows green - the beacon is active.",
+                        "You can hear the lighthouse machinery running smoothly.",
+                        "The lighthouse stairs should now be safe to climb."
+                    ]);
+                }
+            }
+        });
+        
         // Mysterious journal on dock
         this.interactables.push({
             x: 440,
@@ -300,7 +343,8 @@ class World {
                     ]);
                     game.addToInventory('Keeper\'s Journal');
                     this.collected = true;
-                    game.decreaseSanity(12);
+                    // Journal content is disturbing - net sanity loss
+                    game.decreaseSanity(7, 'Disturbing revelations');
                 } else {
                     game.dialogue.start(["You've already taken the journal."]);
                 }
@@ -339,7 +383,7 @@ class World {
                     
                     const level = Math.min(Math.floor((100 - game.sanity) / 30), 2);
                     game.dialogue.start(responses[level]);
-                    game.decreaseSanity(5 + level * 3);
+                    game.decreaseSanity(5 + level * 3, 'Unsettling discovery');
                     this.examined = true;
                 } else {
                     // Allow prayer/meditation for sanity restoration during day
@@ -350,7 +394,7 @@ class World {
                             "The daylight feels warm and protective.",
                             "Your troubled mind feels slightly calmer."
                         ]);
-                        game.increaseSanity(12);
+                        game.increaseSanity(12, 'Quiet prayer');
                         game.gameTime += 0.25; // 15 minutes pass
                     } else if (game.gameTime < 6 || game.gameTime > 18) {
                         game.dialogue.start([
@@ -358,7 +402,7 @@ class World {
                             "You dare not linger here in the darkness.",
                             "Those stone eyes seem to pierce your soul."
                         ]);
-                        game.decreaseSanity(3);
+                        game.decreaseSanity(3, 'Menacing presence');
                     } else {
                         game.dialogue.start([
                             "The statue watches silently over the town square.",
@@ -387,7 +431,7 @@ class World {
                     ]);
                     game.addToInventory('Old Lantern');
                     this.collected = true;
-                    game.increaseSanity(5); // Finding useful items helps sanity
+                    // No manual sanity change - the +5 from important items is sufficient
                 } else {
                     game.dialogue.start(["The hiding spot is empty now."]);
                 }
@@ -412,7 +456,7 @@ class World {
                     ]);
                     game.addToInventory('Boat Hook');
                     this.collected = true;
-                    game.increaseSanity(3);
+                    // No additional sanity change - finding a useful tool is its own reward
                 } else {
                     game.dialogue.start(["The boat hook is no longer here."]);
                 }
@@ -469,11 +513,10 @@ class World {
                         "A brass key lies partially buried near an old building.",
                         "It's tarnished with age, but still solid.",
                         "This must be the lighthouse key you need.",
-                        "You feel a chill as you pick it up... as if something is watching."
+                        "Finding it fills you with hope - you're making progress."
                     ]);
                     game.addToInventory('Lighthouse Key');
                     this.collected = true;
-                    game.decreaseSanity(5);
                 } else {
                     game.dialogue.start(["The key is no longer here."]);
                 }
@@ -498,7 +541,8 @@ class World {
                         "This explains what happened to the previous keeper."
                     ]);
                     game.addToInventory('Cursed Tome');
-                    game.decreaseSanity(15);
+                    // Cursed tome content is disturbing - net sanity loss
+                    game.decreaseSanity(10, 'Forbidden knowledge');
                 } else {
                     game.dialogue.start([
                         "The old bookshop is locked tight.",
@@ -640,7 +684,8 @@ class World {
                     }
                     game.addToInventory('Ship\'s Log');
                     this.searched = true;
-                    game.decreaseSanity(10);
+                    // Ship log content is ominous - net sanity loss
+                    game.decreaseSanity(5, 'Ominous ship records');
                 } else {
                     game.dialogue.start([
                         "The sailboat rocks gently beside the dock.",
@@ -665,25 +710,37 @@ class World {
             type: 'stairs',
             name: 'Spiral Staircase',
             interact: (game) => {
+                if (!game.beaconActive) {
+                    game.dialogue.start([
+                        "Ancient wooden stairs spiral upward into darkness.",
+                        "You take a step, but the rotting wood creaks alarmingly.",
+                        "Without the lighthouse beacon active, it's too dangerous to climb.",
+                        "You need to activate the beacon control panel first."
+                    ]);
+                    game.decreaseSanity(2, 'Fear of the dark stairs');
+                    return;
+                }
+                
                 if (game.hasItem('Cursed Tome')) {
                     game.dialogue.start([
-                        "The wooden stairs creak ominously as you climb.",
+                        "The beacon's light illuminates the wooden stairs.",
+                        "With the lighthouse active, you feel safer climbing.",
                         "Each step echoes in the hollow tower.",
                         "You reach the lamp room at the top.",
-                        "The massive lens sits dark and cold.",
-                        "But now you understand what needs to be done..."
+                        "The massive lens sits glowing with otherworldly energy.",
+                        "Now you understand what needs to be done..."
                     ]);
                     game.player.x = 550;
                     game.player.y = 370; // Move to top of lighthouse
-                    game.decreaseSanity(5);
+                    game.decreaseSanity(5, 'Confronting the truth');
                 } else {
                     game.dialogue.start([
-                        "Ancient wooden stairs spiral upward.",
-                        "But something feels wrong... dangerous.",
+                        "The beacon light makes the stairs visible, but still...",
+                        "Something feels wrong... dangerous.",
                         "You need to understand this place better before ascending.",
                         "Perhaps there's knowledge to be found elsewhere first."
                     ]);
-                    game.decreaseSanity(3);
+                    game.decreaseSanity(3, 'Sensing hidden dangers');
                 }
             }
         });
@@ -708,7 +765,8 @@ class World {
                     ]);
                     game.addToInventory('Final Entry');
                     this.searched = true;
-                    game.decreaseSanity(12);
+                    // Final entry content is disturbing - net sanity loss
+                    game.decreaseSanity(7, 'Final warnings');
                 } else {
                     game.dialogue.start([
                         "The desk has been thoroughly searched.",
@@ -751,7 +809,8 @@ class World {
                         ]);
                         game.addToInventory('Lighthouse Lens');
                         this.collected = true;
-                        game.decreaseSanity(25);
+                        // Lighthouse lens reveals cosmic horror - major sanity loss
+                        game.decreaseSanity(20, 'Cosmic horror revealed');
                         
                         // But understanding the truth also brings some peace
                         setTimeout(() => {
@@ -847,10 +906,10 @@ class World {
             }
         });
         
-        // Old cot/bed in the corner
+        // Old cot/bed in the corner (bottom right of interior, away from door)
         this.interactables.push({
-            x: 565,
-            y: 465,
+            x: 575, // Right side of interior, away from door at x:520
+            y: 550, // Above the door level (door is at y:580)
             width: 25,
             height: 15,
             type: 'bed',
@@ -876,7 +935,7 @@ class World {
                             "The daylight streaming through the windows is comforting.",
                             "You feel slightly more at ease."
                         ]);
-                        game.increaseSanity(8);
+                        game.increaseSanity(8, 'Restful sleep');
                         // Skip some time
                         game.gameTime += 0.5; // 30 minutes
                     } else {
@@ -885,7 +944,7 @@ class World {
                             "You wouldn't want to sleep here at night.",
                             "The darkness holds too many unknowns."
                         ]);
-                        game.decreaseSanity(2);
+                        game.decreaseSanity(2, 'Unsettling environment');
                     }
                 }
             }
@@ -936,10 +995,10 @@ class World {
             }
         });
         
-        // Coat hook with keeper's jacket
+        // Coat hook with keeper's jacket (top right of interior)
         this.interactables.push({
-            x: 580,
-            y: 455,
+            x: 570, // Moved right from 580 to better position
+            y: 435, // Moved up from 455 to separate from bed
             width: 8,
             height: 20,
             type: 'coat',
@@ -2119,6 +2178,9 @@ class World {
     }
     
     renderLighthouseLightBeam(ctx) {
+        // Only render light beam if beacon is active
+        if (!this.game.beaconActive) return;
+        
         // Find the lighthouse entity to get its position
         const lighthouse = this.entities.find(entity => entity.type === 'lighthouse');
         if (!lighthouse) return;
@@ -2126,6 +2188,31 @@ class World {
         // Light beam (varies with time and sanity) - but not visible when inside
         const lightIntensity = this.game.gameTime > 18 || this.game.gameTime < 6 ? 
             0.9 - (this.game.sanity / 100) * 0.2 : 0.4;
+            
+        // Determine light color based on sanity level
+        const isDisturbedLight = this.game.sanity < 25; // Very low sanity makes light red/disturbing
+        const isUnstableLight = this.game.sanity < 50; // Medium-low sanity makes light flicker
+        
+        // Color configuration based on mental state
+        let lightColor = {
+            r: 255, g: 255, b: 170, // Normal warm white light
+            name: 'normal'
+        };
+        
+        if (isDisturbedLight) {
+            // Sinister red light when very disturbed
+            lightColor = {
+                r: 200, g: 50, b: 50, // Deep red
+                name: 'disturbed'
+            };
+        } else if (isUnstableLight) {
+            // Flickering between normal and slightly reddish when unstable
+            const flicker = Math.sin(this.game.time * 8) * 0.5 + 0.5; // Rapid flicker
+            lightColor = {
+                r: 255, g: Math.floor(255 - flicker * 50), b: Math.floor(170 - flicker * 30),
+                name: 'unstable'
+            };
+        }
             
         // Don't render the external light beam when player is inside the lighthouse
         if (lightIntensity > 0.3 && !this.playerInsideLighthouse) {
@@ -2137,8 +2224,8 @@ class World {
             const centerX = lighthouse.x + lighthouse.width/2;
             const centerY = lighthouse.y - 10;
             
-            // Rotating beam effect
-            const rotationSpeed = 0.5; // Speed of rotation
+            // Rotating beam effect (faster when disturbed)
+            const rotationSpeed = isDisturbedLight ? 1.2 : (isUnstableLight ? 0.8 : 0.5);
             const currentRotation = (this.game.time * rotationSpeed) % (Math.PI * 2);
             
             // Main concentrated light beam (rotating)
@@ -2146,12 +2233,12 @@ class World {
             ctx.translate(centerX, centerY);
             ctx.rotate(currentRotation);
             
-            // Create radial gradient for main beam with reduced opacity
+            // Create radial gradient for main beam with sanity-based colors
             const beamGradient = ctx.createLinearGradient(0, 0, 300, 0);
-            beamGradient.addColorStop(0, `rgba(255, 255, 170, ${lightIntensity * 0.4})`);
-            beamGradient.addColorStop(0.3, `rgba(255, 255, 170, ${lightIntensity * 0.3})`);
-            beamGradient.addColorStop(0.7, `rgba(255, 255, 170, ${lightIntensity * 0.15})`);
-            beamGradient.addColorStop(1, `rgba(255, 255, 170, 0)`);
+            beamGradient.addColorStop(0, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, ${lightIntensity * 0.4})`);
+            beamGradient.addColorStop(0.3, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, ${lightIntensity * 0.3})`);
+            beamGradient.addColorStop(0.7, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, ${lightIntensity * 0.15})`);
+            beamGradient.addColorStop(1, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, 0)`);
             
             ctx.fillStyle = beamGradient;
             ctx.beginPath();
@@ -2163,9 +2250,9 @@ class World {
             
             // Add atmospheric scattering effect with wider beam
             const scatterGradient = ctx.createLinearGradient(0, 0, 300, 0);
-            scatterGradient.addColorStop(0, `rgba(255, 255, 200, ${lightIntensity * 0.2})`);
-            scatterGradient.addColorStop(0.5, `rgba(255, 255, 200, ${lightIntensity * 0.1})`);
-            scatterGradient.addColorStop(1, `rgba(255, 255, 200, 0)`);
+            scatterGradient.addColorStop(0, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, ${lightIntensity * 0.2})`);
+            scatterGradient.addColorStop(0.5, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, ${lightIntensity * 0.1})`);
+            scatterGradient.addColorStop(1, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, 0)`);
             
             ctx.fillStyle = scatterGradient;
             ctx.beginPath();
@@ -2177,11 +2264,11 @@ class World {
             
             ctx.restore();
             
-            // Main light source (bright center) - keep lighter blend mode
+            // Main light source (bright center) - use sanity-based colors
             const lightGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 20);
-            lightGradient.addColorStop(0, `rgba(255, 255, 220, ${lightIntensity * 0.6})`);
-            lightGradient.addColorStop(0.5, `rgba(255, 255, 190, ${lightIntensity * 0.4})`);
-            lightGradient.addColorStop(1, `rgba(255, 255, 170, ${lightIntensity * 0.1})`);
+            lightGradient.addColorStop(0, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, ${lightIntensity * 0.6})`);
+            lightGradient.addColorStop(0.5, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, ${lightIntensity * 0.4})`);
+            lightGradient.addColorStop(1, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, ${lightIntensity * 0.1})`);
             
             ctx.fillStyle = lightGradient;
             ctx.beginPath();
@@ -2190,9 +2277,9 @@ class World {
             
             // Secondary ambient light (larger, softer glow)
             const ambientGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 60);
-            ambientGradient.addColorStop(0, `rgba(255, 255, 170, ${lightIntensity * 0.15})`);
-            ambientGradient.addColorStop(0.5, `rgba(255, 255, 170, ${lightIntensity * 0.08})`);
-            ambientGradient.addColorStop(1, `rgba(255, 255, 170, 0)`);
+            ambientGradient.addColorStop(0, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, ${lightIntensity * 0.15})`);
+            ambientGradient.addColorStop(0.5, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, ${lightIntensity * 0.08})`);
+            ambientGradient.addColorStop(1, `rgba(${lightColor.r}, ${lightColor.g}, ${lightColor.b}, 0)`);
             
             ctx.fillStyle = ambientGradient;
             ctx.beginPath();
@@ -2270,44 +2357,109 @@ class World {
             case 'well':
                 this.renderWell(ctx, obj);
                 break;
+                
+            case 'beacon_panel':
+                this.renderBeaconPanel(ctx, obj);
+                break;
         }
     }
     
     renderLighthouse(ctx, obj) {
-        // Lighthouse shadow
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        // Determine if player is in a disturbed mental state
+        const isDisturbedState = this.game.sanity < 25;
+        const isUnstableState = this.game.sanity < 50;
+        
+        // Base colors - darker and more sinister when disturbed
+        let baseColor = '#9aabbb';
+        let towerColor = '#8a9ba8';
+        let topColor = '#6a7b88';
+        let textureColor = '#7a8b98';
+        
+        if (isDisturbedState) {
+            // Dark, foreboding colors when very disturbed
+            baseColor = '#4a3a3a';
+            towerColor = '#3a2a2a';
+            topColor = '#2a1a1a';
+            textureColor = '#5a4a4a';
+        } else if (isUnstableState) {
+            // Slightly darker colors when moderately disturbed
+            baseColor = '#7a8b88';
+            towerColor = '#6a7b78';
+            topColor = '#5a6b68';
+            textureColor = '#6a7b78';
+        }
+        
+        // Lighthouse shadow (darker when disturbed)
+        ctx.fillStyle = isDisturbedState ? 'rgba(20, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)';
         ctx.fillRect(obj.x + 5, obj.y + obj.height + 2, obj.width, 8);
         
         // Lighthouse base structure
-        ctx.fillStyle = '#9aabbb';
+        ctx.fillStyle = baseColor;
         ctx.fillRect(obj.x, obj.y + obj.height - 50, obj.width, 50);
         
         // Main lighthouse tower
-        ctx.fillStyle = '#8a9ba8';
+        ctx.fillStyle = towerColor;
         ctx.fillRect(obj.x + 10, obj.y, obj.width - 20, obj.height - 50);
         
-        // Stone texture on lighthouse
+        // Stone texture on lighthouse (more weathered when disturbed)
         ctx.save();
-        ctx.fillStyle = '#7a8b98';
+        ctx.fillStyle = textureColor;
         for (let y = obj.y; y < obj.y + obj.height - 50; y += 15) {
             for (let x = obj.x + 10; x < obj.x + obj.width - 10; x += 20) {
                 // Use deterministic pattern based on position
-                if (Math.sin(x * 0.1 + y * 0.15) > 0.4) {
-                    ctx.fillRect(x + Math.sin(x * 0.05) * 3, y, 8, 3);
+                const pattern = Math.sin(x * 0.1 + y * 0.15);
+                const threshold = isDisturbedState ? 0.2 : 0.4; // More texture when disturbed
+                if (pattern > threshold) {
+                    const blockSize = isDisturbedState ? 10 : 8; // Larger blocks when disturbed
+                    ctx.fillRect(x + Math.sin(x * 0.05) * 3, y, blockSize, 3);
                 }
             }
         }
         ctx.restore();
         
+        // Add cracks or damage when very disturbed
+        if (isDisturbedState) {
+            ctx.save();
+            ctx.strokeStyle = '#1a0a0a';
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.7;
+            
+            // Jagged cracks down the lighthouse
+            ctx.beginPath();
+            ctx.moveTo(obj.x + 25, obj.y + 30);
+            ctx.lineTo(obj.x + 30, obj.y + 80);
+            ctx.lineTo(obj.x + 35, obj.y + 120);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(obj.x + obj.width - 30, obj.y + 50);
+            ctx.lineTo(obj.x + obj.width - 25, obj.y + 100);
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+        
         // Lighthouse top/lantern room
-        ctx.fillStyle = '#6a7b88';
+        ctx.fillStyle = topColor;
         ctx.fillRect(obj.x + 5, obj.y - 30, obj.width - 10, 40);
         
-        // Lantern room windows
-        ctx.fillStyle = '#4a5b68';
+        // Lantern room windows (darker/reddish when disturbed)
+        const windowColor = isDisturbedState ? '#2a1a1a' : '#4a5b68';
+        ctx.fillStyle = windowColor;
         ctx.fillRect(obj.x + 10, obj.y - 25, 15, 20);
         ctx.fillRect(obj.x + obj.width - 25, obj.y - 25, 15, 20);
         ctx.fillRect(obj.x + obj.width/2 - 7, obj.y - 25, 14, 20);
+        
+        // Add ominous glow to windows when very disturbed
+        if (isDisturbedState) {
+            ctx.save();
+            ctx.globalAlpha = 0.4;
+            ctx.fillStyle = '#800000'; // Dark red glow
+            ctx.fillRect(obj.x + 8, obj.y - 27, 19, 24);
+            ctx.fillRect(obj.x + obj.width - 27, obj.y - 27, 19, 24);
+            ctx.fillRect(obj.x + obj.width/2 - 9, obj.y - 27, 18, 24);
+            ctx.restore();
+        }
         
         // When inside lighthouse, add subtle interior lighting effects from above
         if (this.playerInsideLighthouse) {
@@ -3565,6 +3717,50 @@ class World {
         // Small wooden bucket
         ctx.fillStyle = '#654321';
         ctx.fillRect(obj.x + obj.width/2 - 12, obj.y + obj.height/2 - 8, 8, 6);
+        
+        ctx.restore();
+    }
+    
+    renderBeaconPanel(ctx, obj) {
+        ctx.save();
+        
+        // Panel background - metal with weathered look
+        ctx.fillStyle = '#3a4a4a';
+        ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+        
+        // Metal frame
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+        
+        // Control switches/gauges
+        const centerX = obj.x + obj.width / 2;
+        const centerY = obj.y + obj.height / 2;
+        
+        // Main activation switch - changes color based on beacon state
+        const isBeaconActive = this.game.beaconActive || false;
+        ctx.fillStyle = isBeaconActive ? '#00ff00' : '#ff4444';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY - 8, 6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Switch label
+        ctx.fillStyle = '#cccccc';
+        ctx.font = '8px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('BEACON', centerX, centerY + 8);
+        
+        // Control dial
+        ctx.strokeStyle = '#777777';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY + 15, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Weathering effects
+        ctx.fillStyle = 'rgba(139, 69, 19, 0.3)'; // Rust
+        ctx.fillRect(obj.x + 2, obj.y + 2, 4, 8);
+        ctx.fillRect(obj.x + obj.width - 6, obj.y + obj.height - 10, 4, 8);
         
         ctx.restore();
     }

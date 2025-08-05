@@ -69,6 +69,8 @@ class DialogueSystem {
             box.style.color = '#ffffff';
             box.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
         }
+        
+        // Don't override dialogueText styles here - let applyCSSFormatting handle emphasis
     }
     
     startCurrentText() {
@@ -77,7 +79,15 @@ class DialogueSystem {
             return;
         }
         
-        this.fullText = this.processText(this.currentDialogue[this.currentIndex]);
+        // Skip empty or whitespace-only dialogue entries
+        let currentText = this.currentDialogue[this.currentIndex];
+        if (!currentText || currentText.trim() === '') {
+            this.currentIndex++;
+            this.startCurrentText(); // Recursively try the next one
+            return;
+        }
+        
+        this.fullText = this.processText(currentText);
         this.displayedText = '';
         this.textTimer = 0;
         this.isTextComplete = false;
@@ -108,16 +118,22 @@ class DialogueSystem {
             const char = text[i];
             const charCode = char.charCodeAt(0);
             
+            // Always preserve spaces to prevent word merging
+            if (char === ' ') {
+                distorted += ' ';
+                continue;
+            }
+            
             // Use deterministic "randomness" based on character position and ASCII value
             const pseudo1 = (i * 7 + charCode * 3) % 100;
             const pseudo2 = (i * 11 + charCode * 5) % 100;
             
-            if (pseudo1 < 5 && char !== ' ') {
+            if (pseudo1 < 5) {
                 // Replace with disturbing characters
                 const distortChars = ['█', '▓', '▒', '░', '?', '#', '@'];
                 distorted += distortChars[charCode % distortChars.length];
-            } else if (pseudo2 < 3 && char !== ' ') {
-                // Repeat character
+            } else if (pseudo2 < 3) {
+                // Repeat character (but not spaces)
                 distorted += char + char;
             } else {
                 distorted += char;
@@ -152,7 +168,10 @@ class DialogueSystem {
             }
             
             processed += word;
-            if (i < words.length - 1) processed += ' ';
+            // Always add space between words except after the last word
+            if (i < words.length - 1) {
+                processed += ' ';
+            }
         }
         
         return processed;
@@ -164,6 +183,14 @@ class DialogueSystem {
         this.textTimer += deltaTime;
         
         if (!this.isTextComplete) {
+            // Handle empty text case
+            if (!this.fullText || this.fullText.length === 0) {
+                this.isTextComplete = true;
+                this.displayedText = this.fullText || '';
+                this.updateDisplay();
+                return;
+            }
+            
             // Typewriter effect
             const charactersToShow = Math.floor(this.textTimer * this.textSpeed);
             this.displayedText = this.fullText.substring(0, charactersToShow);
@@ -212,12 +239,7 @@ class DialogueSystem {
     updateDisplay() {
         let displayText = this.displayedText;
         
-        // Add cursor effect if text is still typing
-        if (!this.isTextComplete && Math.floor(this.textTimer * 2) % 2 === 0) {
-            displayText += '█';
-        }
-        
-        // Apply visual effects based on sanity - using deterministic approach
+        // Apply glitch effect at very low sanity
         if (this.game.sanity < 30) {
             // Add glitch effect based on game time instead of random
             const timeBasedGlitch = Math.floor(this.game.time * 10) % 100;
@@ -226,42 +248,86 @@ class DialogueSystem {
             }
         }
         
-        this.dialogueText.innerHTML = this.formatText(displayText);
+        // Always use textContent to preserve spacing
+        this.dialogueText.textContent = displayText;
+        
+        // Apply CSS-based formatting when text is complete
+        if (this.isTextComplete) {
+            this.applyCSSFormatting();
+        }
+    }
+    
+    applyCSSFormatting() {
+        // Get the original plain text
+        const text = this.dialogueText.textContent;
+        this.dialogueText.setAttribute('data-original-text', text);
+        
+        // Clear any previous emphasis styles on the element itself
+        this.dialogueText.style.textShadow = '';
+        this.dialogueText.style.fontWeight = '';
+        this.dialogueText.style.color = '';
+        this.dialogueText.style.filter = '';
+        
+        // Split text into words while preserving spaces
+        const words = text.split(/(\s+)/); // This keeps the spaces in the array
+        let formattedHTML = '';
+        let hasEmphasis = false;
+        
+        for (let i = 0; i < words.length; i++) {
+            const word = words[i];
+            
+            // If it's whitespace, wrap in a span to preserve it
+            if (/^\s+$/.test(word)) {
+                formattedHTML += `<span style="white-space: pre;">${word}</span>`;
+            }
+            // Check for words to emphasize
+            else if (/^lighthouse$/i.test(word.trim())) {
+                formattedHTML += `<span style="text-shadow: 0 0 20px rgba(255, 255, 255, 1.0), 0 0 10px rgba(255, 255, 255, 0.8), 2px 2px 4px rgba(0,0,0,0.8); font-weight: bold; color: #ffffff; filter: brightness(1.5); white-space: pre;">lighthouse</span>`;
+                hasEmphasis = true;
+            }
+            else if (/^key$/i.test(word.trim())) {
+                formattedHTML += `<span style="text-shadow: 0 0 20px rgba(255, 221, 0, 1.0), 0 0 10px rgba(255, 221, 0, 0.8), 2px 2px 4px rgba(0,0,0,0.8); font-weight: bold; color: #ffdd00; filter: brightness(1.5); white-space: pre;">key</span>`;
+                hasEmphasis = true;
+            }
+            else if (/^journal$/i.test(word.trim())) {
+                formattedHTML += `<span style="text-shadow: 0 0 20px rgba(136, 204, 255, 1.0), 0 0 10px rgba(136, 204, 255, 0.8), 2px 2px 4px rgba(0,0,0,0.8); font-weight: bold; color: #88ccff; filter: brightness(1.5); white-space: pre;">journal</span>`;
+                hasEmphasis = true;
+            }
+            else {
+                // Regular word, wrap in span to maintain consistency
+                formattedHTML += `<span style="white-space: pre;">${word}</span>`;
+            }
+        }
+        
+        if (hasEmphasis) {
+            this.dialogueText.innerHTML = formattedHTML;
+        } else {
+            this.dialogueText.textContent = text;
+        }
     }
     
     applyGlitchEffect(text) {
         // Deterministically corrupt some characters based on their position and content
         let glitched = '';
         for (let i = 0; i < text.length; i++) {
-            const charCode = text.charCodeAt(i);
+            const char = text[i];
+            const charCode = char.charCodeAt(0);
+            
+            // Always preserve spaces and basic punctuation to maintain readability
+            if (char === ' ' || char === '.' || char === ',' || char === '!' || char === '?') {
+                glitched += char;
+                continue;
+            }
+            
             // Use deterministic "randomness" based on position and game time
             const pseudo = (i * 13 + Math.floor(this.game.time * 5) + charCode) % 100;
             if (pseudo < 5) {
                 glitched += String.fromCharCode(33 + ((i * 7 + charCode) % 94));
             } else {
-                glitched += text[i];
+                glitched += char;
             }
         }
         return glitched;
-    }
-    
-    formatText(text) {
-        // Apply formatting based on game state
-        const sanity = this.game.sanity;
-        
-        if (sanity < 30) {
-            // Low sanity text formatting
-            text = text.replace(/\.\.\./g, '<span style="color: #ff6666;">...</span>');
-            text = text.replace(/whisper/gi, '<span style="color: #ff4444; font-style: italic;">whisper</span>');
-            text = text.replace(/watch/gi, '<span style="color: #ff4444; font-weight: bold;">watch</span>');
-        }
-        
-        // Emphasize important words
-        text = text.replace(/lighthouse/gi, '<span style="font-weight: bold;">lighthouse</span>');
-        text = text.replace(/key/gi, '<span style="color: #ffdd00;">key</span>');
-        text = text.replace(/journal/gi, '<span style="color: #88ccff;">journal</span>');
-        
-        return text;
     }
     
     advance() {

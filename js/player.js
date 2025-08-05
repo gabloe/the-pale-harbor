@@ -156,12 +156,23 @@ class Player {
         setTimeout(() => {
             switch (area) {
                 case 'Lighthouse Interior':
+                    // Only show interior dialogue if player is actually inside via door interaction
+                    if (this.game.world.playerInsideLighthouse) {
+                        this.game.dialogue.start([
+                            "The lighthouse creaks ominously as you step inside.",
+                            "Dust motes dance in the pale light filtering through grimy windows.",
+                            "Something feels... wrong about this place."
+                        ]);
+                        this.game.decreaseSanity(5);
+                    }
+                    break;
+                    
+                case 'Lighthouse Entrance':
                     this.game.dialogue.start([
-                        "The lighthouse creaks ominously as you step inside.",
-                        "Dust motes dance in the pale light filtering through grimy windows.",
-                        "Something feels... wrong about this place."
+                        "The lighthouse looms before you, its beacon dark and silent.",
+                        "The heavy wooden door is sealed tight against the coastal winds.",
+                        "You'll need to find a way inside to investigate."
                     ]);
-                    this.game.decreaseSanity(5);
                     break;
                     
                 case 'Harbor Docks':
