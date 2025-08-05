@@ -10,6 +10,10 @@ class World {
         // Lighthouse state tracking
         this.playerInsideLighthouse = false;
         
+        // Animation system for smooth transitions
+        this.animations = [];
+        this.boatAnimation = null;
+        
         // Map data
         this.maps = {
             lighthouse_area: {
@@ -45,8 +49,8 @@ class World {
                     { type: 'building', x: 1400, y: 550, width: 85, height: 80 },
                     // Welcome sign (positioned at town entrance, not overlapping building)
                     { type: 'sign', x: 800, y: 520, width: 40, height: 60 },
-                    // Sailboat in the harbor
-                    { type: 'sailboat', x: 320, y: 1000, width: 60, height: 40 },
+                    // Sailboat in the harbor - positioned well to the left of dock, midway up
+                    { type: 'sailboat', x: 300, y: 880, width: 60, height: 40, rotation: -0.3 },
                     // Trees and obstacles - positioned to avoid building overlaps
                     { type: 'tree', x: 300, y: 300, width: 40, height: 60 },
                     { type: 'tree', x: 700, y: 200, width: 35, height: 50 },
@@ -84,7 +88,32 @@ class World {
                     
                     // Rocks and other details
                     { type: 'rock', x: 150, y: 500, width: 30, height: 25 },
-                    { type: 'rock', x: 780, y: 380, width: 25, height: 20 }
+                    { type: 'rock', x: 750, y: 350, width: 25, height: 20 }, // Moved away from well area
+                    
+                    // Ancient well in town square - positioned in clear center area
+                    { type: 'well', x: 1000, y: 580, width: 40, height: 40 },
+                    
+                    // Northern mountain range - creates a natural boundary
+                    { type: 'mountain', x: 0, y: 0, width: 200, height: 150 },
+                    { type: 'mountain', x: 180, y: 20, width: 250, height: 180 },
+                    { type: 'mountain', x: 400, y: 0, width: 300, height: 160 },
+                    { type: 'mountain', x: 680, y: 15, width: 280, height: 170 },
+                    { type: 'mountain', x: 940, y: 0, width: 320, height: 155 },
+                    { type: 'mountain', x: 1240, y: 25, width: 250, height: 165 },
+                    { type: 'mountain', x: 1470, y: 0, width: 280, height: 145 },
+                    { type: 'mountain', x: 1730, y: 20, width: 318, height: 170 },
+                    
+                    // Dense forest along the mountain foothills
+                    { type: 'dense_forest', x: 50, y: 140, width: 180, height: 80 },
+                    { type: 'dense_forest', x: 220, y: 160, width: 200, height: 90 },
+                    { type: 'dense_forest', x: 410, y: 145, width: 220, height: 85 },
+                    { type: 'dense_forest', x: 620, y: 155, width: 190, height: 75 },
+                    { type: 'dense_forest', x: 800, y: 140, width: 210, height: 90 },
+                    { type: 'dense_forest', x: 1000, y: 150, width: 240, height: 80 },
+                    { type: 'dense_forest', x: 1230, y: 165, width: 200, height: 85 },
+                    { type: 'dense_forest', x: 1420, y: 135, width: 220, height: 95 },
+                    { type: 'dense_forest', x: 1630, y: 155, width: 190, height: 75 },
+                    { type: 'dense_forest', x: 1810, y: 165, width: 238, height: 85 }
                 ]
             }
         };
@@ -169,8 +198,8 @@ class World {
                 blocksMovement: true // Always blocks movement - player must use interaction
             });
         } else {
-            // Normal collision object - but make docks and lampposts walkable
-            if (obj.type !== 'dock' && obj.type !== 'lamppost') {
+            // Normal collision object - but make docks, lampposts, wells, and sailboats walkable
+            if (obj.type !== 'dock' && obj.type !== 'lamppost' && obj.type !== 'well' && obj.type !== 'sailboat') {
                 this.collisionObjects.push({
                     x: obj.x,
                     y: obj.y,
@@ -364,6 +393,31 @@ class World {
                 }
             }
         });
+
+        // Boat hook near lighthouse (for pulling sailboat)
+        this.interactables.push({
+            x: 470,
+            y: 440,
+            width: 12,
+            height: 8,
+            type: 'item',
+            name: 'Boat Hook',
+            collected: false,
+            interact: function(game) {
+                if (!this.collected) {
+                    game.dialogue.start([
+                        "An old boat hook lies half-buried near the lighthouse foundation.",
+                        "The metal is rusted but the hook is still solid.",
+                        "This could be useful for reaching things at a distance..."
+                    ]);
+                    game.addToInventory('Boat Hook');
+                    this.collected = true;
+                    game.increaseSanity(3);
+                } else {
+                    game.dialogue.start(["The boat hook is no longer here."]);
+                }
+            }
+        });
         
         // Welcome sign interaction
         this.interactables.push({
@@ -428,8 +482,8 @@ class World {
 
         // Mysterious book in one of the buildings
         this.interactables.push({
-            x: 860,
-            y: 440,
+            x: 850,
+            y: 480,
             width: 30,
             height: 30,
             type: 'building_door',
@@ -455,10 +509,10 @@ class World {
             }
         });
 
-        // Strange well in town square (positioned near but not overlapping statue)
+        // Strange well in town square (positioned in open area between roads)
         this.interactables.push({
-            x: 1000, // Adjusted to be west of the repositioned statue
-            y: 520,
+            x: 1000, // Clear area in town square center
+            y: 580,  // Above the main horizontal street
             width: 40,
             height: 40,
             type: 'well',
@@ -492,29 +546,93 @@ class World {
             }
         });
 
+        // Sailboat rope at dock edge
+        this.interactables.push({
+            x: 370, // At the left edge of the dock
+            y: 880, // Same level as the boat
+            width: 15,
+            height: 8,
+            type: 'rope',
+            name: 'Mooring Rope',
+            boatPulled: false,
+            interact: function(game) {
+                if (game.hasItem('Boat Hook')) {
+                    if (!this.boatPulled) {
+                        game.dialogue.start([
+                            "You use the boat hook to grab the mooring rope.",
+                            "Hand over hand, you pull the sailboat closer to the dock.",
+                            "The boat creaks as it moves through the water...",
+                            "Now you can safely board and search it."
+                        ]);
+                        this.boatPulled = true;
+                        
+                        // Get current sailboat position
+                        const sailboat = game.world.interactables.find(item => item.type === 'sailboat');
+                        if (sailboat) {
+                            const startX = sailboat.x;
+                            const startY = sailboat.y;
+                            const startRotation = sailboat.rotation || -0.3; // Initially angled away from dock
+                            const endX = 360; // Much closer to dock
+                            const endY = 880;
+                            const endRotation = 0; // Parallel to dock
+                            
+                            // Start smooth animation
+                            game.world.animateSailboat(startX, startY, endX, endY, startRotation, endRotation, 2.5);
+                        }
+                        
+                        game.increaseSanity(5); // Success feels good
+                    } else {
+                        game.dialogue.start([
+                            "The sailboat is already pulled close to the dock.",
+                            "You can board it safely now."
+                        ]);
+                    }
+                } else {
+                    game.dialogue.start([
+                        "A thick rope trails from the dock into the water.",
+                        "It's attached to the abandoned sailboat floating nearby.",
+                        "You need something to grab and pull the rope with...",
+                        "Maybe a hook or similar tool?"
+                    ]);
+                }
+            }
+        });
+
         // Sailboat interaction - adds story depth
         this.interactables.push({
-            x: 320,
-            y: 1000,
+            x: 300, // Well to the left of the dock
+            y: 880, // Midway up the dock
             width: 60,
             height: 40,
             type: 'sailboat',
             name: 'Abandoned Sailboat',
             searched: false,
+            rotation: -0.3, // Initially angled away from dock
             interact: function(game) {
+                // Check if rope has been used to pull boat closer
+                const rope = game.world.interactables.find(item => item.type === 'rope');
+                if (!rope || !rope.boatPulled) {
+                    game.dialogue.start([
+                        "The sailboat floats just out of reach in the dark water.",
+                        "You'd need to pull it closer to the dock to board safely.",
+                        "There appears to be a rope connecting it to the dock..."
+                    ]);
+                    return;
+                }
+                
                 if (!this.searched) {
                     if (game.sanity < 70) {
                         game.dialogue.start([
-                            "The sailboat rocks gently in the harbor.",
-                            "Inside, you find a captain's log, water-damaged but readable:",
+                            "You carefully step aboard the weathered sailboat.",
+                            "Inside the cabin, you find a captain's log, water-damaged but readable:",
                             "'Day 12: The lighthouse hasn't lit for three nights...'",
                             "'Day 15: We can hear singing from the water. Not human singing.'",
                             "'Day 18: God help us. They're coming up from the deep.'"
                         ]);
                     } else {
                         game.dialogue.start([
-                            "An old sailboat bobs in the harbor.",
-                            "Inside, you find a ship's log with concerning entries:",
+                            "You step carefully onto the old sailboat's deck.",
+                            "Inside the small cabin, you find a ship's log with concerning entries:",
                             "'Lighthouse has been dark for days.'",
                             "'Strange sounds from the water at night.'",
                             "The entries abruptly stop two weeks ago."
@@ -525,7 +643,7 @@ class World {
                     game.decreaseSanity(10);
                 } else {
                     game.dialogue.start([
-                        "The sailboat creaks ominously in the wind.",
+                        "The sailboat rocks gently beside the dock.",
                         "You've already searched it thoroughly."
                     ]);
                 }
@@ -643,11 +761,12 @@ class World {
                                 "Understanding the truth, however horrible, brings clarity.",
                                 "You are no longer helpless against the unknown."
                             ]);
+                            
+                            // Trigger Chapter 1 completion after dialogue
+                            setTimeout(() => {
+                                game.triggerChapterEnd();
+                            }, 3000);
                         }, 2000);
-                        // This could trigger the final sequence
-                        if (game.triggerFinalSequence) {
-                            game.triggerFinalSequence();
-                        }
                     } else {
                         game.dialogue.start([
                             "The lighthouse lens pulses with strange energy.",
@@ -1010,6 +1129,9 @@ class World {
     
     update(deltaTime) {
         try {
+            // Update animations
+            this.updateAnimations(deltaTime);
+            
             // Update all entities with safety checks
             this.entities.forEach(entity => {
                 if (entity.update) {
@@ -1079,6 +1201,77 @@ class World {
                 return isStaticWorldObject;
             });
         }
+    }
+    
+    updateAnimations(deltaTime) {
+        // Update boat animation if it exists
+        if (this.boatAnimation) {
+            this.boatAnimation.elapsedTime += deltaTime;
+            const progress = Math.min(this.boatAnimation.elapsedTime / this.boatAnimation.duration, 1);
+            
+            // Use easing function for smooth animation
+            const easedProgress = this.easeInOutCubic(progress);
+            
+            // Interpolate position
+            const currentX = this.boatAnimation.startX + (this.boatAnimation.endX - this.boatAnimation.startX) * easedProgress;
+            const currentY = this.boatAnimation.startY + (this.boatAnimation.endY - this.boatAnimation.startY) * easedProgress;
+            
+            // Interpolate rotation (initially pointing away from dock, ending parallel to dock)
+            let currentRotation;
+            if (progress < 0.5) {
+                // First half: maintain original rotation
+                currentRotation = this.boatAnimation.startRotation;
+            } else {
+                // Second half: rotate to parallel with dock
+                const rotationProgress = (progress - 0.5) * 2; // 0 to 1 for second half
+                currentRotation = this.boatAnimation.startRotation + 
+                    (this.boatAnimation.endRotation - this.boatAnimation.startRotation) * this.easeInOutCubic(rotationProgress);
+            }
+            
+            // Update all sailboat positions
+            const sailboat = this.interactables.find(item => item.type === 'sailboat');
+            if (sailboat) {
+                sailboat.x = currentX;
+                sailboat.y = currentY;
+                sailboat.rotation = currentRotation;
+            }
+            
+            const sailboatEntity = this.entities.find(entity => entity.type === 'sailboat');
+            if (sailboatEntity) {
+                sailboatEntity.x = currentX;
+                sailboatEntity.y = currentY;
+                sailboatEntity.rotation = currentRotation;
+            }
+            
+            const staticSailboat = this.maps[this.currentMap].staticObjects.find(obj => obj.type === 'sailboat');
+            if (staticSailboat) {
+                staticSailboat.x = currentX;
+                staticSailboat.y = currentY;
+                staticSailboat.rotation = currentRotation;
+            }
+            
+            // Animation finished
+            if (progress >= 1) {
+                this.boatAnimation = null;
+            }
+        }
+    }
+    
+    easeInOutCubic(t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+    
+    animateSailboat(startX, startY, endX, endY, startRotation, endRotation, duration = 3.0) {
+        this.boatAnimation = {
+            startX: startX,
+            startY: startY,
+            endX: endX,
+            endY: endY,
+            startRotation: startRotation,
+            endRotation: endRotation,
+            duration: duration,
+            elapsedTime: 0
+        };
     }
     
     addHallucinationEntities(deltaTime) {
@@ -1182,6 +1375,9 @@ class World {
         
         // Render interactables
         this.renderInteractables(ctx);
+        
+        // Render lighthouse light beam AFTER everything else as an overlay effect
+        this.renderLighthouseLightBeam(ctx);
     }
     
     renderLighthouseInterior(ctx, map) {
@@ -1922,6 +2118,101 @@ class World {
         }
     }
     
+    renderLighthouseLightBeam(ctx) {
+        // Find the lighthouse entity to get its position
+        const lighthouse = this.entities.find(entity => entity.type === 'lighthouse');
+        if (!lighthouse) return;
+        
+        // Light beam (varies with time and sanity) - but not visible when inside
+        const lightIntensity = this.game.gameTime > 18 || this.game.gameTime < 6 ? 
+            0.9 - (this.game.sanity / 100) * 0.2 : 0.4;
+            
+        // Don't render the external light beam when player is inside the lighthouse
+        if (lightIntensity > 0.3 && !this.playerInsideLighthouse) {
+            ctx.save();
+            
+            // Use lighter blend mode for proper light overlay effect
+            ctx.globalCompositeOperation = 'lighter';
+            
+            const centerX = lighthouse.x + lighthouse.width/2;
+            const centerY = lighthouse.y - 10;
+            
+            // Rotating beam effect
+            const rotationSpeed = 0.5; // Speed of rotation
+            const currentRotation = (this.game.time * rotationSpeed) % (Math.PI * 2);
+            
+            // Main concentrated light beam (rotating)
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(currentRotation);
+            
+            // Create radial gradient for main beam with reduced opacity
+            const beamGradient = ctx.createLinearGradient(0, 0, 300, 0);
+            beamGradient.addColorStop(0, `rgba(255, 255, 170, ${lightIntensity * 0.4})`);
+            beamGradient.addColorStop(0.3, `rgba(255, 255, 170, ${lightIntensity * 0.3})`);
+            beamGradient.addColorStop(0.7, `rgba(255, 255, 170, ${lightIntensity * 0.15})`);
+            beamGradient.addColorStop(1, `rgba(255, 255, 170, 0)`);
+            
+            ctx.fillStyle = beamGradient;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(300, -25);
+            ctx.lineTo(300, 25);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Add atmospheric scattering effect with wider beam
+            const scatterGradient = ctx.createLinearGradient(0, 0, 300, 0);
+            scatterGradient.addColorStop(0, `rgba(255, 255, 200, ${lightIntensity * 0.2})`);
+            scatterGradient.addColorStop(0.5, `rgba(255, 255, 200, ${lightIntensity * 0.1})`);
+            scatterGradient.addColorStop(1, `rgba(255, 255, 200, 0)`);
+            
+            ctx.fillStyle = scatterGradient;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(300, -40);
+            ctx.lineTo(300, 40);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.restore();
+            
+            // Main light source (bright center) - keep lighter blend mode
+            const lightGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 20);
+            lightGradient.addColorStop(0, `rgba(255, 255, 220, ${lightIntensity * 0.6})`);
+            lightGradient.addColorStop(0.5, `rgba(255, 255, 190, ${lightIntensity * 0.4})`);
+            lightGradient.addColorStop(1, `rgba(255, 255, 170, ${lightIntensity * 0.1})`);
+            
+            ctx.fillStyle = lightGradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 20, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Secondary ambient light (larger, softer glow)
+            const ambientGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 60);
+            ambientGradient.addColorStop(0, `rgba(255, 255, 170, ${lightIntensity * 0.15})`);
+            ambientGradient.addColorStop(0.5, `rgba(255, 255, 170, ${lightIntensity * 0.08})`);
+            ambientGradient.addColorStop(1, `rgba(255, 255, 170, 0)`);
+            
+            ctx.fillStyle = ambientGradient;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 60, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Add subtle flickering effect to simulate lighthouse mechanics
+            const flicker = 0.95 + Math.sin(this.game.time * 8) * 0.05;
+            ctx.globalAlpha = lightIntensity * flicker;
+            
+            // Core light (very bright center)
+            ctx.fillStyle = `rgba(255, 255, 255, ${lightIntensity * 0.4})`;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+    }
+    
     renderStaticObject(ctx, obj) {
         switch (obj.type) {
             case 'lighthouse':
@@ -1967,6 +2258,18 @@ class World {
             case 'lens':
                 this.renderLens(ctx, obj);
                 break;
+                
+            case 'mountain':
+                this.renderMountain(ctx, obj);
+                break;
+                
+            case 'dense_forest':
+                this.renderDenseForest(ctx, obj);
+                break;
+                
+            case 'well':
+                this.renderWell(ctx, obj);
+                break;
         }
     }
     
@@ -2006,107 +2309,26 @@ class World {
         ctx.fillRect(obj.x + obj.width - 25, obj.y - 25, 15, 20);
         ctx.fillRect(obj.x + obj.width/2 - 7, obj.y - 25, 14, 20);
         
-        // Light beam (varies with time and sanity) - but not visible when inside
-        const lightIntensity = this.game.gameTime > 18 || this.game.gameTime < 6 ? 
-            0.9 - (this.game.sanity / 100) * 0.2 : 0.4;
-        
-        // Don't render the external light beam when player is inside the lighthouse
-        if (lightIntensity > 0.3 && !this.playerInsideLighthouse) {
-            ctx.save();
-            
-            const centerX = obj.x + obj.width/2;
-            const centerY = obj.y - 10;
-            
-            // Rotating beam effect
-            const rotationSpeed = 0.5; // Speed of rotation
-            const currentRotation = (this.game.time * rotationSpeed) % (Math.PI * 2);
-            
-            // Main concentrated light beam (rotating)
-            ctx.save();
-            ctx.translate(centerX, centerY);
-            ctx.rotate(currentRotation);
-            
-            // Create radial gradient for main beam
-            const beamGradient = ctx.createLinearGradient(0, 0, 300, 0);
-            beamGradient.addColorStop(0, `rgba(255, 255, 170, ${lightIntensity * 0.8})`);
-            beamGradient.addColorStop(0.3, `rgba(255, 255, 170, ${lightIntensity * 0.6})`);
-            beamGradient.addColorStop(0.7, `rgba(255, 255, 170, ${lightIntensity * 0.3})`);
-            beamGradient.addColorStop(1, `rgba(255, 255, 170, 0)`);
-            
-            ctx.fillStyle = beamGradient;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(300, -25);
-            ctx.lineTo(300, 25);
-            ctx.closePath();
-            ctx.fill();
-            
-            // Add atmospheric scattering effect
-            const scatterGradient = ctx.createLinearGradient(0, 0, 300, 0);
-            scatterGradient.addColorStop(0, `rgba(255, 255, 200, ${lightIntensity * 0.4})`);
-            scatterGradient.addColorStop(0.5, `rgba(255, 255, 200, ${lightIntensity * 0.2})`);
-            scatterGradient.addColorStop(1, `rgba(255, 255, 200, 0)`);
-            
-            ctx.fillStyle = scatterGradient;
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(300, -40);
-            ctx.lineTo(300, 40);
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.restore();
-            
-            // Main light source (bright center)
-            const lightGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 20);
-            lightGradient.addColorStop(0, `rgba(255, 255, 220, ${lightIntensity})`);
-            lightGradient.addColorStop(0.5, `rgba(255, 255, 190, ${lightIntensity * 0.7})`);
-            lightGradient.addColorStop(1, `rgba(255, 255, 170, ${lightIntensity * 0.3})`);
-            
-            ctx.fillStyle = lightGradient;
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, 20, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Secondary ambient light (larger, softer glow)
-            const ambientGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 60);
-            ambientGradient.addColorStop(0, `rgba(255, 255, 170, ${lightIntensity * 0.3})`);
-            ambientGradient.addColorStop(0.5, `rgba(255, 255, 170, ${lightIntensity * 0.15})`);
-            ambientGradient.addColorStop(1, `rgba(255, 255, 170, 0)`);
-            
-            ctx.fillStyle = ambientGradient;
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, 60, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Add subtle flickering effect to simulate lighthouse mechanics
-            const flicker = 0.95 + Math.sin(this.game.time * 8) * 0.05;
-            ctx.globalAlpha = lightIntensity * flicker;
-            
-            // Core light (very bright center)
-            ctx.fillStyle = `rgba(255, 255, 255, ${lightIntensity * 0.9})`;
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, 8, 0, Math.PI * 2);
-            ctx.fill();
-            
-            ctx.restore();
-        }
-        
         // When inside lighthouse, add subtle interior lighting effects from above
-        if (this.playerInsideLighthouse && lightIntensity > 0.3) {
-            const centerX = obj.x + obj.width/2;
-            const topY = obj.y + 20; // Light filtering down from above
-            
-            // Soft overhead glow
-            const interiorGradient = ctx.createRadialGradient(centerX, topY, 0, centerX, topY, 80);
-            interiorGradient.addColorStop(0, `rgba(255, 255, 200, ${lightIntensity * 0.15})`);
-            interiorGradient.addColorStop(0.5, `rgba(255, 255, 200, ${lightIntensity * 0.08})`);
-            interiorGradient.addColorStop(1, `rgba(255, 255, 200, 0)`);
-            
-            ctx.fillStyle = interiorGradient;
-            ctx.beginPath();
-            ctx.arc(centerX, topY, 80, 0, Math.PI * 2);
-            ctx.fill();
+        if (this.playerInsideLighthouse) {
+            const lightIntensity = this.game.gameTime > 18 || this.game.gameTime < 6 ? 
+                0.9 - (this.game.sanity / 100) * 0.2 : 0.4;
+                
+            if (lightIntensity > 0.3) {
+                const centerX = obj.x + obj.width/2;
+                const topY = obj.y + 20; // Light filtering down from above
+                
+                // Soft overhead glow
+                const interiorGradient = ctx.createRadialGradient(centerX, topY, 0, centerX, topY, 80);
+                interiorGradient.addColorStop(0, `rgba(255, 255, 200, ${lightIntensity * 0.15})`);
+                interiorGradient.addColorStop(0.5, `rgba(255, 255, 200, ${lightIntensity * 0.08})`);
+                interiorGradient.addColorStop(1, `rgba(255, 255, 200, 0)`);
+                
+                ctx.fillStyle = interiorGradient;
+                ctx.beginPath();
+                ctx.arc(centerX, topY, 80, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
         
         // Door
@@ -2485,20 +2707,36 @@ class World {
         const bobOffset = Math.sin(time * 1.5) * 3 + Math.cos(time * 0.8) * 2;
         const boatY = obj.y + bobOffset;
         
+        // Get rotation (default to slightly angled away from dock if not set)
+        const rotation = obj.rotation !== undefined ? obj.rotation : -0.3;
+        
+        // Save context for rotation
+        ctx.save();
+        
+        // Translate to boat center for rotation
+        const centerX = obj.x + obj.width / 2;
+        const centerY = boatY + obj.height / 2;
+        ctx.translate(centerX, centerY);
+        ctx.rotate(rotation);
+        
+        // Render boat relative to center (adjust coordinates)
+        const halfWidth = obj.width / 2;
+        const halfHeight = obj.height / 2;
+        
         // Boat shadow in water (moves with bobbing)
         ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        ctx.fillRect(obj.x + 2, boatY + obj.height + 2, obj.width, 6);
+        ctx.fillRect(-halfWidth + 2, halfHeight - 15 + 2, obj.width, 6);
         
         // Main boat hull
         ctx.fillStyle = '#8a6a4a';
-        ctx.fillRect(obj.x + 5, boatY + obj.height - 15, obj.width - 10, 15);
+        ctx.fillRect(-halfWidth + 5, halfHeight - 30, obj.width - 10, 15);
         
-        // Boat bow (pointed front)
+        // Boat bow (pointed front) - now points in direction of rotation
         ctx.fillStyle = '#8a6a4a';
         ctx.beginPath();
-        ctx.moveTo(obj.x + obj.width - 5, boatY + obj.height - 15);
-        ctx.lineTo(obj.x + obj.width + 5, boatY + obj.height - 7);
-        ctx.lineTo(obj.x + obj.width - 5, boatY + obj.height);
+        ctx.moveTo(halfWidth - 5, halfHeight - 30);
+        ctx.lineTo(halfWidth + 5, halfHeight - 22);
+        ctx.lineTo(halfWidth - 5, halfHeight - 15);
         ctx.closePath();
         ctx.fill();
         
@@ -2507,35 +2745,35 @@ class World {
         ctx.lineWidth = 1;
         for (let i = 0; i < 3; i++) {
             ctx.beginPath();
-            ctx.moveTo(obj.x + 5, boatY + obj.height - 12 + i * 4);
-            ctx.lineTo(obj.x + obj.width - 5, boatY + obj.height - 12 + i * 4);
+            ctx.moveTo(-halfWidth + 5, halfHeight - 27 + i * 4);
+            ctx.lineTo(halfWidth - 5, halfHeight - 27 + i * 4);
             ctx.stroke();
         }
         
         // Mast
         ctx.fillStyle = '#5a4a3a';
-        ctx.fillRect(obj.x + obj.width/2 - 2, boatY + obj.height - 60, 4, 45);
+        ctx.fillRect(-2, halfHeight - 75, 4, 45);
         
         // Main sail
         ctx.fillStyle = '#f0f0e0';
         const sailSway = Math.sin(time * 2) * 2; // Sail sways in the wind
         ctx.save();
-        ctx.translate(obj.x + obj.width/2, boatY + obj.height - 45);
+        ctx.translate(0, halfHeight - 60);
         ctx.rotate(sailSway * 0.05); // Slight rotation for wind effect
         ctx.fillRect(-15, -20, 30, 25);
         ctx.restore();
         
         // Sail details (patches and wear)
         ctx.fillStyle = 'rgba(200, 200, 180, 0.7)';
-        ctx.fillRect(obj.x + obj.width/2 - 10, boatY + obj.height - 55, 8, 3);
-        ctx.fillRect(obj.x + obj.width/2 + 2, boatY + obj.height - 50, 6, 4);
+        ctx.fillRect(-10, halfHeight - 70, 8, 3);
+        ctx.fillRect(2, halfHeight - 65, 6, 4);
         
         // Jib sail (smaller front sail)
         ctx.fillStyle = '#e8e8d0';
         ctx.beginPath();
-        ctx.moveTo(obj.x + obj.width/2, boatY + obj.height - 40);
-        ctx.lineTo(obj.x + obj.width/2 + 12 + sailSway, boatY + obj.height - 35);
-        ctx.lineTo(obj.x + obj.width/2 + 8 + sailSway, boatY + obj.height - 20);
+        ctx.moveTo(0, halfHeight - 55);
+        ctx.lineTo(12 + sailSway, halfHeight - 50);
+        ctx.lineTo(8 + sailSway, halfHeight - 35);
         ctx.closePath();
         ctx.fill();
         
@@ -2544,17 +2782,42 @@ class World {
         ctx.lineWidth = 1;
         // Main mast to bow
         ctx.beginPath();
-        ctx.moveTo(obj.x + obj.width/2, boatY + obj.height - 55);
-        ctx.lineTo(obj.x + obj.width - 2, boatY + obj.height - 12);
+        ctx.moveTo(0, halfHeight - 70);
+        ctx.lineTo(halfWidth - 2, halfHeight - 27);
         ctx.stroke();
         
         // Main mast to stern
         ctx.beginPath();
-        ctx.moveTo(obj.x + obj.width/2, boatY + obj.height - 55);
-        ctx.lineTo(obj.x + 8, boatY + obj.height - 12);
+        ctx.moveTo(0, halfHeight - 70);
+        ctx.lineTo(-halfWidth + 8, halfHeight - 27);
         ctx.stroke();
         
-        // Rope connecting to dock
+        // Small details that should rotate with the boat
+        // Boat name on hull
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '8px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('MARY', 0, halfHeight - 20);
+        ctx.textAlign = 'left';
+        
+        // Small cabin/wheelhouse
+        ctx.fillStyle = '#7a5a3a';
+        ctx.fillRect(-8, halfHeight - 40, 16, 10);
+        
+        // Cabin window
+        ctx.fillStyle = '#333366';
+        ctx.fillRect(-5, halfHeight - 38, 4, 3);
+        ctx.fillRect(1, halfHeight - 38, 4, 3);
+        
+        // Boat details on deck
+        ctx.fillStyle = '#6a4a2a';
+        ctx.fillRect(-halfWidth + 8, halfHeight - 25, 4, 2); // Cleat
+        ctx.fillRect(halfWidth - 12, halfHeight - 25, 4, 2); // Another cleat
+        
+        // Restore context
+        ctx.restore();
+        
+        // Rope connecting to dock (drawn after rotation so it stays in world coordinates)
         ctx.strokeStyle = '#8a7a6a';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -2575,26 +2838,6 @@ class World {
         ctx.beginPath();
         ctx.arc(obj.x + 5, boatY + obj.height - 8, 2, 0, Math.PI * 2);
         ctx.fill();
-        
-        // Small details
-        // Boat name on hull
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '8px Courier New';
-        ctx.textAlign = 'center';
-        ctx.fillText('MARY', obj.x + obj.width/2, boatY + obj.height - 5);
-        ctx.textAlign = 'left';
-        
-        // Small cabin/wheelhouse
-        ctx.fillStyle = '#7a5a3a';
-        ctx.fillRect(obj.x + obj.width/2 - 8, boatY + obj.height - 25, 16, 10);
-        
-        // Cabin window
-        ctx.fillStyle = '#4a6a8a';
-        ctx.fillRect(obj.x + obj.width/2 - 4, boatY + obj.height - 22, 8, 4);
-        
-        // Window reflection
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.fillRect(obj.x + obj.width/2 - 3, boatY + obj.height - 21, 3, 2);
     }
     
     renderLamppost(ctx, obj) {
@@ -3125,6 +3368,203 @@ class World {
         ctx.fillStyle = '#4a4a4a';
         ctx.font = '8px monospace';
         ctx.fillText('...watch...', x + 10, y + h - 3);
+        
+        ctx.restore();
+    }
+    
+    renderMountain(ctx, obj) {
+        // Create natural mountain silhouette with depth simulation
+        ctx.save();
+        
+        // Calculate depth factor based on x position for color variation
+        const depthFactor = (obj.x / 2048) * 0.4 + 0.3; // 0.3 to 0.7 range
+        
+        // Single mountain layer with depth-based coloring
+        const baseR = 20 + depthFactor * 25; // 20-45
+        const baseG = 30 + depthFactor * 25; // 30-55  
+        const baseB = 50 + depthFactor * 25; // 50-75
+        
+        ctx.fillStyle = `rgb(${Math.floor(baseR)}, ${Math.floor(baseG)}, ${Math.floor(baseB)})`;
+        
+        // Create mountain silhouette
+        ctx.beginPath();
+        ctx.moveTo(obj.x, obj.y + obj.height);
+        
+        // Generate natural peaks
+        const peakCount = 3 + Math.floor(obj.width / 100);
+        const peakPoints = [];
+        
+        for (let i = 0; i <= peakCount; i++) {
+            const peakX = obj.x + (i * obj.width) / peakCount;
+            
+            // Create varied peak heights
+            const heightVariation = Math.sin(obj.x * 0.008 + i * 1.5) * 0.3 + 0.4; // 0.1 to 0.7
+            const peakHeight = obj.y + obj.height * heightVariation;
+            
+            // Add small random variations for natural look
+            const variance = Math.sin(obj.x * 0.015 + i * 2.3) * obj.height * 0.05;
+            const finalHeight = peakHeight + variance;
+            
+            ctx.lineTo(peakX, finalHeight);
+            peakPoints.push({ 
+                x: peakX, 
+                y: finalHeight, 
+                height: obj.y + obj.height - finalHeight 
+            });
+        }
+        
+        ctx.lineTo(obj.x + obj.width, obj.y + obj.height);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Add snow caps on tallest peaks (only for closer mountains)
+        if (depthFactor < 0.6) {
+            ctx.fillStyle = `rgba(240, 245, 255, ${0.8 - depthFactor * 0.5})`;
+            peakPoints.forEach(peak => {
+                if (peak.height > obj.height * 0.5) { // Only on taller peaks
+                    const snowSize = Math.min(15, peak.height * 0.15);
+                    ctx.beginPath();
+                    ctx.moveTo(peak.x - snowSize, peak.y + snowSize * 0.8);
+                    ctx.lineTo(peak.x, peak.y);
+                    ctx.lineTo(peak.x + snowSize, peak.y + snowSize * 0.8);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            });
+        }
+        
+        // Add subtle ridges for texture (only on closer mountains)
+        if (depthFactor < 0.5) {
+            ctx.strokeStyle = `rgba(${Math.floor(baseR - 10)}, ${Math.floor(baseG - 10)}, ${Math.floor(baseB - 10)}, 0.7)`;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            
+            for (let i = 1; i < peakCount; i++) {
+                const ridgeX = obj.x + (i * obj.width) / peakCount;
+                const ridgeStart = obj.y + obj.height * 0.5;
+                const ridgeEnd = obj.y + obj.height * 0.85;
+                
+                ctx.moveTo(ridgeX, ridgeStart);
+                ctx.lineTo(ridgeX - 8, ridgeEnd);
+            }
+            ctx.stroke();
+        }
+        
+        // Subtle ground shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        ctx.fillRect(obj.x + 2, obj.y + obj.height, obj.width - 4, 4);
+        
+        ctx.restore();
+    }
+    
+    renderDenseForest(ctx, obj) {
+        // Dense, dark forest that blocks passage
+        ctx.save();
+        
+        // Forest shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.fillRect(obj.x + 3, obj.y + obj.height, obj.width, 8);
+        
+        // Dense forest base (very dark green)
+        ctx.fillStyle = '#0a2a0a';
+        ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+        
+        // Create layered tree effect
+        const treeCount = Math.floor(obj.width / 15);
+        for (let i = 0; i < treeCount; i++) {
+            const treeX = obj.x + (i * obj.width) / treeCount + Math.sin(obj.x * 0.1 + i) * 8;
+            const treeHeight = obj.height * (0.7 + Math.cos(obj.x * 0.05 + i) * 0.3);
+            const treeY = obj.y + obj.height - treeHeight;
+            
+            // Tree trunk (barely visible)
+            ctx.fillStyle = '#1a1a0a';
+            ctx.fillRect(treeX - 2, obj.y + obj.height - 15, 4, 15);
+            
+            // Dense foliage layers
+            ctx.fillStyle = '#1a3a1a';
+            ctx.beginPath();
+            ctx.arc(treeX, treeY + treeHeight * 0.3, 12, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#0a2a0a';
+            ctx.beginPath();
+            ctx.arc(treeX, treeY + treeHeight * 0.2, 10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Very dark top layer
+            ctx.fillStyle = '#051a05';
+            ctx.beginPath();
+            ctx.arc(treeX, treeY + treeHeight * 0.1, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Add some undergrowth texture
+        ctx.fillStyle = '#152a15';
+        for (let x = obj.x; x < obj.x + obj.width; x += 20) {
+            const bushHeight = 8 + Math.sin(x * 0.1) * 4;
+            ctx.fillRect(x, obj.y + obj.height - bushHeight, 15, bushHeight);
+        }
+        
+        // Atmospheric fog between trees
+        ctx.fillStyle = 'rgba(30, 40, 30, 0.3)';
+        for (let i = 0; i < 3; i++) {
+            const fogX = obj.x + (i * obj.width) / 3;
+            const fogY = obj.y + obj.height * 0.4;
+            ctx.beginPath();
+            ctx.arc(fogX, fogY, 25, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        ctx.restore();
+    }
+    
+    renderWell(ctx, obj) {
+        ctx.save();
+        
+        // Well base - stone circular structure
+        ctx.fillStyle = '#4a4a4a';
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = 2;
+        
+        // Outer rim
+        ctx.beginPath();
+        ctx.arc(obj.x + obj.width/2, obj.y + obj.height/2, obj.width/2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Inner dark opening
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(obj.x + obj.width/2, obj.y + obj.height/2, obj.width/3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Stone texture lines
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const startX = obj.x + obj.width/2 + Math.cos(angle) * obj.width/3;
+            const startY = obj.y + obj.height/2 + Math.sin(angle) * obj.width/3;
+            const endX = obj.x + obj.width/2 + Math.cos(angle) * obj.width/2;
+            const endY = obj.y + obj.height/2 + Math.sin(angle) * obj.width/2;
+            
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+        }
+        
+        // Wooden bucket rope (if visible)
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(obj.x + obj.width/2 - 8, obj.y);
+        ctx.lineTo(obj.x + obj.width/2 - 8, obj.y + obj.height/2 - 5);
+        ctx.stroke();
+        
+        // Small wooden bucket
+        ctx.fillStyle = '#654321';
+        ctx.fillRect(obj.x + obj.width/2 - 12, obj.y + obj.height/2 - 8, 8, 6);
         
         ctx.restore();
     }

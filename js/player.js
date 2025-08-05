@@ -133,39 +133,55 @@ class Player {
         if (newArea && newArea !== this.game.currentLocation) {
             this.game.updateLocation(newArea);
             
-            // Trigger area-specific events
+            // Trigger area-specific events only if we haven't seen this area before
             this.onAreaEnter(newArea);
         }
     }
     
     onAreaEnter(area) {
-        switch (area) {
-            case 'Lighthouse Interior':
-                this.game.dialogue.start([
-                    "The lighthouse creaks ominously as you step inside.",
-                    "Dust motes dance in the pale light filtering through grimy windows.",
-                    "Something feels... wrong about this place."
-                ]);
-                this.game.decreaseSanity(5);
-                break;
-                
-            case 'Harbor Docks':
-                this.game.dialogue.start([
-                    "The docks stretch into the fog like skeletal fingers.",
-                    "You can hear water lapping against the posts, but can't see the shore.",
-                    "Is that... whispering you hear in the mist?"
-                ]);
-                this.game.decreaseSanity(3);
-                break;
-                
-            case 'Town Square':
-                this.game.dialogue.start([
-                    "The town square is eerily empty.",
-                    "Street lamps flicker intermittently, casting dancing shadows.",
-                    "Where is everyone?"
-                ]);
-                break;
+        // Initialize visited areas tracker if it doesn't exist
+        if (!this.visitedAreas) {
+            this.visitedAreas = new Set();
         }
+        
+        // Only show area dialogue if we haven't visited this area before in this session
+        if (this.visitedAreas.has(area)) {
+            return; // Already visited, don't repeat dialogue
+        }
+        
+        // Mark area as visited
+        this.visitedAreas.add(area);
+        
+        // Add a small delay before showing dialogue to prevent rapid-fire triggers
+        setTimeout(() => {
+            switch (area) {
+                case 'Lighthouse Interior':
+                    this.game.dialogue.start([
+                        "The lighthouse creaks ominously as you step inside.",
+                        "Dust motes dance in the pale light filtering through grimy windows.",
+                        "Something feels... wrong about this place."
+                    ]);
+                    this.game.decreaseSanity(5);
+                    break;
+                    
+                case 'Harbor Docks':
+                    this.game.dialogue.start([
+                        "The docks stretch into the fog like skeletal fingers.",
+                        "You can hear water lapping against the posts, but can't see the shore.",
+                        "Is that... whispering you hear in the mist?"
+                    ]);
+                    this.game.decreaseSanity(3);
+                    break;
+                    
+                case 'Town Square':
+                    this.game.dialogue.start([
+                        "The town square is eerily empty.",
+                        "Street lamps flicker intermittently, casting dancing shadows.",
+                        "Where is everyone?"
+                    ]);
+                    break;
+            }
+        }, 100); // Small delay to prevent rapid triggering
     }
     
     updateAnimation(deltaTime) {

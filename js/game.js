@@ -23,6 +23,9 @@ class Game {
         
         // Input handling
         this.keys = {};
+        this.lastKeyPressTime = {}; // Track last press time for each key
+        this.keyDebounceTime = 200; // 200ms debounce for action keys (E, I, M)
+        this.lastInteractionTime = 0; // Track last interaction time to prevent spam
         this.setupInput();
         
         // Camera
@@ -57,18 +60,33 @@ class Game {
                 this.keys[keyName.toLowerCase()] = true;
             }
             
-            // Handle specific actions
+            // Helper function to check if enough time has passed since last key press
+            const canPressKey = (key) => {
+                const now = Date.now();
+                const lastPress = this.lastKeyPressTime[key] || 0;
+                if (now - lastPress >= this.keyDebounceTime) {
+                    this.lastKeyPressTime[key] = now;
+                    return true;
+                }
+                return false;
+            };
+            
+            // Handle specific actions with debouncing
             if (e.key === ' ' && this.gameState === 'dialogue') {
                 this.dialogue.advance();
                 e.preventDefault();
             }
             
-            if (e.key.toLowerCase() === 'e') {
+            if (e.key.toLowerCase() === 'e' && canPressKey('e')) {
                 this.interact();
             }
             
-            if (e.key.toLowerCase() === 'i') {
+            if (e.key.toLowerCase() === 'i' && canPressKey('i')) {
                 this.toggleInventory();
+            }
+            
+            if (e.key.toLowerCase() === 'm' && canPressKey('m')) {
+                this.attemptMeditation();
             }
         });
         
@@ -84,12 +102,16 @@ class Game {
     }
     
     startGame() {
-        // Initial dialogue
+        // Initial dialogue with survival tips
         this.dialogue.start([
             "The boat's engine sputters to silence as you reach the dock.",
             "Pale Harbor stretches before you, shrouded in an unnatural fog.",
             "The lighthouse beam hasn't been seen for three days...",
-            "Something is wrong here. You can feel it in your bones."
+            "Something is wrong here. You can feel it in your bones.",
+            "",
+            "Remember: Your sanity will drain at night but heal during dawn and day.",
+            "Press 'M' to meditate in safe places during daylight to restore sanity.",
+            "Sleep in beds, pray at statues, and find important items to stay sane."
         ]);
         
         this.updateLocation('Lighthouse Entrance');
@@ -126,16 +148,16 @@ class Game {
         this.horrorEffects.update(deltaTime);
         this.dialogue.update(deltaTime);
         
-        // Sanity changes over time
+        // Sanity changes over time (much slower rates)
         if (this.gameTime > 22 || this.gameTime < 6) { 
-            // Night time - lose sanity faster
-            this.sanity -= deltaTime * 2;
+            // Night time - lose sanity slowly (takes about 8-10 minutes to lose all sanity)
+            this.sanity -= deltaTime * 0.2;
         } else if (this.gameTime >= 6 && this.gameTime <= 8) {
             // Dawn - slowly restore sanity
-            this.sanity += deltaTime * 1;
+            this.sanity += deltaTime * 0.3;
         } else if (this.gameTime >= 10 && this.gameTime <= 16) {
             // Midday - slowly restore sanity when it's bright
-            this.sanity += deltaTime * 0.5;
+            this.sanity += deltaTime * 0.1;
         }
         
         this.sanity = Math.max(0, Math.min(100, this.sanity));
@@ -143,6 +165,7 @@ class Game {
         // Check for game over conditions
         if (this.sanity <= 0 && this.gameState === 'playing') {
             this.triggerGameOver('sanity');
+            return; // Stop further updates
         }
         
         this.updateUI();
@@ -224,6 +247,13 @@ class Game {
     interact() {
         if (this.gameState !== 'playing') return;
         
+        // Prevent rapid interaction spam
+        const now = Date.now();
+        if (this.lastInteractionTime && now - this.lastInteractionTime < 300) {
+            return; // 300ms cooldown between interactions
+        }
+        this.lastInteractionTime = now;
+        
         const interactables = this.world.getInteractablesNear(this.player.x, this.player.y, 50);
         
         if (interactables.length > 0) {
@@ -303,7 +333,23 @@ class Game {
             timeDisplay.style.zIndex = '1000';
             document.body.appendChild(timeDisplay);
         }
-        timeDisplay.textContent = `Time: ${timeString}`;
+        
+        // Show sanity status and restoration info
+        let sanityStatus = '';
+        if (this.gameTime >= 6 && this.gameTime <= 8) {
+            sanityStatus = ' (Dawn - Slowly Healing)';
+            timeDisplay.style.color = '#90c090'; // Light green
+        } else if (this.gameTime >= 10 && this.gameTime <= 16) {
+            sanityStatus = ' (Daylight - Healing)';
+            timeDisplay.style.color = '#c0c090'; // Light yellow
+        } else if (this.gameTime > 22 || this.gameTime < 6) {
+            sanityStatus = ' (Night - Losing Sanity)';
+            timeDisplay.style.color = '#c09090'; // Light red
+        } else {
+            timeDisplay.style.color = 'white';
+        }
+        
+        timeDisplay.textContent = `Time: ${timeString}${sanityStatus}`;
     }
     
     updateInventoryUI() {
@@ -419,12 +465,166 @@ class Game {
         this.sanity = Math.min(100, this.sanity);
     }
     
+    attemptMeditation() {
+        // Check if meditation is possible
+        if (this.gameState !== 'playing') return;
+        
+        // Must be during daylight hours (6 AM to 9 PM) - extended hours
+        if (this.gameTime < 6 || this.gameTime > 21) {
+            this.dialogue.start([
+                "It's too dark to find peace right now.",
+                "You can meditate safely from 6 AM to 9 PM."
+            ]);
+            return;
+        }
+        
+        // Check if sanity is already full
+        if (this.sanity >= 95) {
+            this.dialogue.start([
+                "You feel as calm as you can be in this place.",
+                "Your mind is already at relative peace."
+            ]);
+            return;
+        }
+        
+        // Check if player is in a safe area (not near water or in lighthouse interior)
+        const playerY = this.player.y;
+        const isNearWater = playerY > 750; // Water starts around y=800
+        const isInDangerZone = isNearWater; // Removed lighthouse interior restriction
+        
+        if (isInDangerZone) {
+            this.dialogue.start([
+                "This doesn't feel like a safe place to rest.",
+                "You need to find a quieter location away from the water."
+            ]);
+            return;
+        }
+        
+        // Successful meditation - better restoration
+        const sanityGain = 12 + Math.floor(Math.random() * 8); // 12-19 sanity
+        const timePass = 0.25; // 15 minutes
+        
+        this.dialogue.start([
+            "You sit quietly and close your eyes.",
+            "Taking deep breaths, you try to center yourself.",
+            "The daylight warms your face and calms your nerves.",
+            `You feel much more at peace. (+${sanityGain} Sanity)`
+        ]);
+        
+        this.increaseSanity(sanityGain);
+        this.gameTime += timePass;
+        
+        // Ensure time doesn't go past 24 hours
+        if (this.gameTime >= 24) {
+            this.gameTime -= 24; // Reset to next day
+        }
+    }
+    
+    triggerChapterEnd() {
+        this.gameState = 'chapter_end';
+        
+        // Show Chapter 1 completion screen
+        this.showChapterEndScreen();
+        
+        // Set up for potential continuation or restart
+        setTimeout(() => {
+            this.showChapterContinueOptions();
+        }, 5000);
+    }
+    
+    showChapterEndScreen() {
+        // Create chapter end overlay
+        let chapterEndDiv = document.getElementById('chapterEndScreen');
+        if (!chapterEndDiv) {
+            chapterEndDiv = document.createElement('div');
+            chapterEndDiv.id = 'chapterEndScreen';
+            chapterEndDiv.style.position = 'fixed';
+            chapterEndDiv.style.top = '0';
+            chapterEndDiv.style.left = '0';
+            chapterEndDiv.style.width = '100%';
+            chapterEndDiv.style.height = '100%';
+            chapterEndDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.95)';
+            chapterEndDiv.style.color = '#ffffff';
+            chapterEndDiv.style.display = 'flex';
+            chapterEndDiv.style.flexDirection = 'column';
+            chapterEndDiv.style.justifyContent = 'center';
+            chapterEndDiv.style.alignItems = 'center';
+            chapterEndDiv.style.fontSize = '24px';
+            chapterEndDiv.style.fontFamily = 'serif';
+            chapterEndDiv.style.textAlign = 'center';
+            chapterEndDiv.style.zIndex = '10000';
+            chapterEndDiv.style.opacity = '0';
+            chapterEndDiv.style.transition = 'opacity 3s ease-in';
+            document.body.appendChild(chapterEndDiv);
+        }
+        
+        chapterEndDiv.innerHTML = `
+            <div style="margin-bottom: 40px; font-size: 48px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); color: #4a90e2;">
+                CHAPTER ONE COMPLETE
+            </div>
+            <div style="margin-bottom: 30px; font-size: 28px; color: #cccccc;">
+                "The Lighthouse Keeper's Secret"
+            </div>
+            <div style="margin-bottom: 40px; font-size: 18px; color: #999999; max-width: 600px; line-height: 1.6;">
+                You have uncovered the truth behind the lighthouse and claimed the mysterious lens. 
+                The first chapter of your journey through Pale Harbor has ended, but darker mysteries await...
+            </div>
+            <div style="margin-bottom: 20px; font-size: 16px; color: #888888;">
+                Survival Time: ${this.getFormattedSurvivalTime()}
+            </div>
+            <div style="margin-bottom: 20px; font-size: 16px; color: #888888;">
+                Final Sanity: ${Math.round(this.sanity)}%
+            </div>
+            <div style="font-size: 14px; color: #666666; font-style: italic;">
+                Preparing for Chapter Two...
+            </div>
+        `;
+        
+        // Fade in the chapter end screen
+        setTimeout(() => {
+            chapterEndDiv.style.opacity = '1';
+        }, 100);
+    }
+    
+    showChapterContinueOptions() {
+        const chapterEndDiv = document.getElementById('chapterEndScreen');
+        if (chapterEndDiv) {
+            // Add continue options
+            const continueDiv = document.createElement('div');
+            continueDiv.style.marginTop = '40px';
+            continueDiv.innerHTML = `
+                <div style="margin-bottom: 30px; font-size: 32px; color: #e2a04a; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
+                    CHAPTER TWO
+                </div>
+                <div style="margin-bottom: 30px; font-size: 20px; color: #cccccc;">
+                    "The Deep Ones Rising"
+                </div>
+                <div style="margin-bottom: 40px; font-size: 16px; color: #999999; max-width: 500px; line-height: 1.5;">
+                    The lighthouse lens pulses with otherworldly energy in your hands. 
+                    Something stirs in the harbor depths, drawn by the lens's power. 
+                    Your true test is only beginning...
+                </div>
+                <div style="font-size: 24px; color: #ff6666; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
+                    TO BE CONTINUED...
+                </div>
+                <div style="margin-top: 30px; font-size: 14px; color: #888888;">
+                    Press F5 to restart Chapter One
+                </div>
+            `;
+            
+            chapterEndDiv.appendChild(continueDiv);
+        }
+    }
+    
     lerp(a, b, t) {
         return a + (b - a) * t;
     }
     
     triggerGameOver(type) {
         this.gameState = 'gameover';
+        
+        // Immediately show game over screen
+        this.showGameOverScreen(type);
         
         // Stop the game loop essentially by preventing player updates
         switch (type) {
@@ -437,7 +637,7 @@ class Game {
                     "",
                     "You have been consumed by the horror of Pale Harbor.",
                     "",
-                    "GAME OVER",
+                    "GAME OVER - MADNESS CLAIMED YOU",
                     "",
                     "Press F5 to restart your journey."
                 ]);
@@ -495,6 +695,88 @@ class Game {
                 }
             });
         }, 3000);
+    }
+    
+    showGameOverScreen(type) {
+        // Create a more visible game over overlay
+        let gameOverDiv = document.getElementById('gameOverScreen');
+        if (!gameOverDiv) {
+            gameOverDiv = document.createElement('div');
+            gameOverDiv.id = 'gameOverScreen';
+            gameOverDiv.style.position = 'fixed';
+            gameOverDiv.style.top = '0';
+            gameOverDiv.style.left = '0';
+            gameOverDiv.style.width = '100%';
+            gameOverDiv.style.height = '100%';
+            gameOverDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+            gameOverDiv.style.color = '#ff4444';
+            gameOverDiv.style.display = 'flex';
+            gameOverDiv.style.flexDirection = 'column';
+            gameOverDiv.style.justifyContent = 'center';
+            gameOverDiv.style.alignItems = 'center';
+            gameOverDiv.style.fontSize = '24px';
+            gameOverDiv.style.fontFamily = 'serif';
+            gameOverDiv.style.textAlign = 'center';
+            gameOverDiv.style.zIndex = '9999';
+            gameOverDiv.style.opacity = '0';
+            gameOverDiv.style.transition = 'opacity 2s ease-in';
+            document.body.appendChild(gameOverDiv);
+        }
+        
+        const messages = {
+            'sanity': {
+                title: 'MADNESS CONSUMED YOU',
+                subtitle: 'Your sanity reached zero in the cursed harbor',
+                flavor: 'The whispers from the deep claimed your mind...'
+            },
+            'shadow': {
+                title: 'SHADOW TOUCHED',
+                subtitle: 'The darkness between worlds found you',
+                flavor: 'You became one with the eternal shadow...'
+            },
+            'default': {
+                title: 'GAME OVER',
+                subtitle: 'The horror of Pale Harbor claims another soul',
+                flavor: 'Some mysteries are too dangerous to uncover...'
+            }
+        };
+        
+        const message = messages[type] || messages['default'];
+        
+        gameOverDiv.innerHTML = `
+            <div style="margin-bottom: 30px; font-size: 36px; text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">
+                ${message.title}
+            </div>
+            <div style="margin-bottom: 20px; font-size: 18px; color: #cc6666;">
+                ${message.subtitle}
+            </div>
+            <div style="margin-bottom: 30px; font-size: 16px; color: #999999; font-style: italic;">
+                ${message.flavor}
+            </div>
+            <div style="margin-bottom: 20px; font-size: 14px; color: #ffffff;">
+                Survival Time: ${this.getFormattedSurvivalTime()}
+            </div>
+            <div style="font-size: 16px; color: #888888;">
+                Press F5 to restart your journey into darkness
+            </div>
+        `;
+        
+        // Fade in the game over screen
+        setTimeout(() => {
+            gameOverDiv.style.opacity = '1';
+        }, 100);
+    }
+    
+    getFormattedSurvivalTime() {
+        const totalMinutes = Math.floor(this.time / 60);
+        const minutes = totalMinutes % 60;
+        const hours = Math.floor(totalMinutes / 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else {
+            return `${minutes}m ${Math.floor(this.time % 60)}s`;
+        }
     }
 }
 

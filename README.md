@@ -77,7 +77,8 @@ Items in The Pale Harbor are used **automatically** when you interact with objec
 - **Keeper's Journal**: Found on the dock - unlocks access to the bookshop and provides story context
 - **Old Lantern**: Found behind the lighthouse - automatically used when exploring dark areas like the ancient well
 - **Cursed Tome**: Found in the bookshop (requires Keeper's Journal first) - provides knowledge needed for lighthouse stairs and well exploration
-- **Ship's Log**: Found in the sailboat - provides additional story context
+- **Ship's Log**: Found in the sailboat (requires Boat Hook to pull boat close first) - provides additional story context
+- **Boat Hook**: Found near the lighthouse - required to pull the sailboat close to the dock
 - **Final Entry**: Found at the keeper's desk inside the lighthouse - required for accessing the lighthouse lens
 - **Lighthouse Lens**: The ultimate goal - found at the top of the lighthouse (requires Final Entry and Cursed Tome)
 
@@ -85,10 +86,11 @@ Items in The Pale Harbor are used **automatically** when you interact with objec
 1. Start by collecting the **Keeper's Journal** from the dock
 2. Find the **Lighthouse Key** hidden in the town square (near coordinates 1180, 690)
 3. Get the **Old Lantern** from behind the lighthouse
-4. Search the **sailboat** for the Ship's Log
-5. Use the journal to access the **bookshop** and get the Cursed Tome
-6. Use the key to enter the **lighthouse** and search the keeper's desk
-7. Use your knowledge to climb the stairs and claim the **lighthouse lens**
+4. Find the **Boat Hook** near the lighthouse and use it to pull the sailboat close
+5. Search the **sailboat** for the Ship's Log (now accessible after pulling it close)
+6. Use the journal to access the **bookshop** and get the Cursed Tome
+7. Use the key to enter the **lighthouse** and search the keeper's desk
+8. Use your knowledge to climb the stairs and claim the **lighthouse lens**
 
 ## Sanity System
 
@@ -158,11 +160,45 @@ The game is designed to be easily modifiable:
 - **Minimum requirements**: ES6 JavaScript support
 
 ## Getting Started
-1. Open `index.html` in a modern web browser
-2. Use WASD or arrow keys to move
-3. Press E to interact with highlighted objects
-4. Follow the story through dialogue and exploration
-5. Monitor your sanity and survive the night
+
+### Setup and Installation
+1. **Clone or download** the game files to your local machine
+2. **Start a local web server** (required for proper file loading):
+   
+   **Option A: Using Python 3**
+   ```bash
+   python3 -m http.server 8000
+   ```
+   
+   **Option B: Using Python 2**
+   ```bash
+   python -m SimpleHTTPServer 8000
+   ```
+   
+   **Option C: Using Node.js (if installed)**
+   ```bash
+   npx http-server -p 8000
+   ```
+
+3. **Open your web browser** and navigate to:
+   ```
+   http://localhost:8000
+   ```
+
+4. **Click on `index.html`** or navigate directly to:
+   ```
+   http://localhost:8000/index.html
+   ```
+
+### Playing the Game
+1. Use **WASD** or **arrow keys** to move around the harbor
+2. Press **E** to interact with highlighted objects
+3. Follow the story through dialogue and exploration
+4. Monitor your sanity bar (blue bar in upper left)
+5. Collect items automatically by interacting with them
+6. Survive the psychological horrors of Pale Harbor
+
+**Important:** The game must be run through a web server (not opened directly as a file) due to browser security restrictions for loading game assets.
 
 ## Expansion Ideas
 The game is designed for easy expansion with:
